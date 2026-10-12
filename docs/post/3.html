@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html data-color-mode="light" data-dark-theme="dark" data-light-theme="light" lang="zh-CN">
+<head>
+    <meta content="text/html; charset=utf-8" http-equiv="content-type" />
+    <meta name="viewport" content="width=device-width,initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <link href='https://mirrors.sustech.edu.cn/cdnjs/ajax/libs/Primer/21.0.7/primer.css' rel='stylesheet' />
+    
+    <link rel="icon" href="https://avatars.githubusercontent.com/u/225638635?v=4"><script>
+        let theme = localStorage.getItem("meek_theme") || "light";
+        document.documentElement.setAttribute("data-color-mode", theme);
+    </script>
+<meta name="description" content="我有一台服务器，上面跑着一个 WordPress 站点。">
+<meta property="og:title" content="唯一的公网入口：把静态站挂进 nginx 子路径">
+<meta property="og:description" content="我有一台服务器，上面跑着一个 WordPress 站点。">
+<meta property="og:type" content="article">
+<meta property="og:url" content="https://tech-zerolei.github.io/post/3.html">
+<meta property="og:image" content="https://avatars.githubusercontent.com/u/225638635?v=4">
+<title>唯一的公网入口：把静态站挂进 nginx 子路径</title>
+<link href="//unpkg.com/@wooorm/starry-night@2.1.1/style/both.css" rel="stylesheet" />
+
+
+</head>
+<style>
+body{box-sizing: border-box;min-width: 200px;max-width: 900px;margin: 20px auto;padding: 45px;font-size: 16px;font-family: sans-serif;line-height: 1.25;}
+#header{display:flex;padding-bottom:8px;border-bottom: 1px solid var(--borderColor-muted, var(--color-border-muted));margin-bottom: 16px;}
+#footer {margin-top:64px; text-align: center;font-size: small;}
+
+</style>
+
+<style>
+.postTitle{margin: auto 0;font-size:40px;font-weight:bold;}
+.title-right{display:flex;margin:auto 0 0 auto;}
+.title-right .circle{padding: 14px 16px;margin-right:8px;}
+#postBody{border-bottom: 1px solid var(--color-border-default);padding-bottom:36px;}
+#postBody hr{height:2px;}
+#cmButton{height:48px;margin-top:48px;}
+#comments{margin-top:64px;}
+.g-emoji{font-size:24px;}
+@media (max-width: 600px) {
+    body {padding: 8px;}
+    .postTitle{font-size:24px;}
+}
+.copy-feedback {
+    display: none;
+    position: absolute;
+    top: 10px;
+    right: 50px;
+    color: var(--color-fg-on-emphasis);
+    background-color: var(--color-fg-muted);
+    border-radius: 3px;
+    padding: 5px 8px;
+    font-size: 12px;
+}
+</style>
+
+
+
+
+<body>
+    <div id="header">
+<h1 class="postTitle">唯一的公网入口：把静态站挂进 nginx 子路径</h1>
+<div class="title-right">
+    <a href="https://tech-zerolei.github.io" id="buttonHome" class="btn btn-invisible circle" title="首页">
+        <svg class="octicon" width="16" height="16">
+            <path id="pathHome" fill-rule="evenodd"></path>
+        </svg>
+    </a>
+    
+    <a href="https://github.com/tech-zerolei/tech-zerolei.github.io/issues/3" target="_blank" class="btn btn-invisible circle" title="Issue">
+        <svg class="octicon" width="16" height="16">
+            <path id="pathIssue" fill-rule="evenodd"></path>
+        </svg>
+    </a>
+    
+
+    <a class="btn btn-invisible circle" onclick="modeSwitch();" title="切换主题">
+        <svg class="octicon" width="16" height="16" >
+            <path id="themeSwitch" fill-rule="evenodd"></path>
+        </svg>
+    </a>
+
+</div>
+</div>
+    <div id="content">
+<div class="markdown-body" id="postBody"><p>我有一台服务器，上面跑着一个 WordPress 站点。我想把另一件东西——一个 Vite 构建的静态站点——挂到同一个域名下，用一个子路径 <code class="notranslate">/line/</code> 访问。</p>
+<p>听起来是五分钟的事。实际上我改了四遍配置，重启了三次 nginx，最后发现问题根本不在 nginx 上。</p>
+<p>先把结论放在前面：<strong>这台机器是 NAT 共享公网 IP，只有一个端口能从外面进来。所有配置都必须围绕这个事实来写。</strong></p>
+<h2>一、先搞清楚外面能看见哪些端口</h2>
+<p>服务器环境：Debian 12 + 宝塔面板 12.0.0 + nginx 1.28.3。</p>
+<p>我以为登录用的 SSH 端口（49683）就是服务商分给我的那一组端口之一，其他端口应该也能通。测完发现完全不是这样：</p>
+<markdown-accessiblity-table><table role="table">
+<thead>
+<tr>
+<th>公网端口</th>
+<th>实际落到</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>49683</td>
+<td>内网 22</td>
+<td>SSH</td>
+</tr>
+<tr>
+<td><strong>57914</strong></td>
+<td><strong>内网 80</strong></td>
+<td>唯一的公网 Web 入口</td>
+</tr>
+<tr>
+<td>80 / 443 / 888 / 8888 / 29436 / 39000-40000</td>
+<td>无映射</td>
+<td>公网完全不通</td>
+</tr>
+<tr>
+<td>8080 / 2052 / 8443 / 22 / 3306</td>
+<td><strong>别人的机器</strong></td>
+<td>同一公网 IP 下的其他租户</td>
+</tr>
+</tbody>
+</table></markdown-accessiblity-table>
+<p>最后一行是最要命的。这台机器不能监听 8080——公网上 8080 指向的是同 IP 下另一个租户。我如果按直觉写「应用监听 8080，防火墙放行」，外面看到的会是别人的服务。</p>
+<p><strong>探测方法</strong>：起一组监听器，每个端口返回带端口号的标记，然后从公网逐个访问，看谁回应。</p>
+<div class="highlight highlight-source-python"><pre class="notranslate"><span class="pl-c">#!/usr/bin/env python3</span>
+<span class="pl-c"># 每个端口回一个带端口号的标记，用来确认公网端口到底落到内网哪个端口</span>
+<span class="pl-k">import</span> <span class="pl-s1">socket</span>, <span class="pl-s1">sys</span>, <span class="pl-s1">threading</span>
+
+<span class="pl-c1">PORTS</span> <span class="pl-c1">=</span> [<span class="pl-en">int</span>(<span class="pl-s1">x</span>) <span class="pl-k">for</span> <span class="pl-s1">x</span> <span class="pl-c1">in</span> <span class="pl-s1">sys</span>.<span class="pl-c1">argv</span>[<span class="pl-c1">1</span>:]] <span class="pl-c1">or</span> [<span class="pl-c1">29436</span>, <span class="pl-c1">39000</span>, <span class="pl-c1">39001</span>, <span class="pl-c1">39002</span>, <span class="pl-c1">8888</span>, <span class="pl-c1">888</span>]
+
+<span class="pl-k">def</span> <span class="pl-en">serve</span>(<span class="pl-s1">port</span>):
+    <span class="pl-s1">s</span> <span class="pl-c1">=</span> <span class="pl-s1">socket</span>.<span class="pl-c1">socket</span>(<span class="pl-s1">socket</span>.<span class="pl-c1">AF_INET</span>, <span class="pl-s1">socket</span>.<span class="pl-c1">SOCK_STREAM</span>)
+    <span class="pl-s1">s</span>.<span class="pl-c1">setsockopt</span>(<span class="pl-s1">socket</span>.<span class="pl-c1">SOL_SOCKET</span>, <span class="pl-s1">socket</span>.<span class="pl-c1">SO_REUSEADDR</span>, <span class="pl-c1">1</span>)
+    <span class="pl-k">try</span>:
+        <span class="pl-s1">s</span>.<span class="pl-c1">bind</span>((<span class="pl-s">"0.0.0.0"</span>, <span class="pl-s1">port</span>))
+    <span class="pl-k">except</span> <span class="pl-v">Exception</span> <span class="pl-k">as</span> <span class="pl-s1">e</span>:
+        <span class="pl-en">print</span>(<span class="pl-s">"bind %d failed: %s"</span> <span class="pl-c1">%</span> (<span class="pl-s1">port</span>, <span class="pl-s1">e</span>), <span class="pl-s1">flush</span><span class="pl-c1">=</span><span class="pl-c1">True</span>)
+        <span class="pl-k">return</span>
+    <span class="pl-s1">s</span>.<span class="pl-c1">listen</span>(<span class="pl-c1">16</span>)
+    <span class="pl-en">print</span>(<span class="pl-s">"listening %d"</span> <span class="pl-c1">%</span> <span class="pl-s1">port</span>, <span class="pl-s1">flush</span><span class="pl-c1">=</span><span class="pl-c1">True</span>)
+    <span class="pl-k">while</span> <span class="pl-c1">True</span>:
+        <span class="pl-s1">c</span>, <span class="pl-s1">a</span> <span class="pl-c1">=</span> <span class="pl-s1">s</span>.<span class="pl-c1">accept</span>()
+        <span class="pl-s1">body</span> <span class="pl-c1">=</span> (<span class="pl-s">"MARKER-PORT-%d<span class="pl-cce">\n</span>"</span> <span class="pl-c1">%</span> <span class="pl-s1">port</span>).<span class="pl-c1">encode</span>()
+        <span class="pl-s1">c</span>.<span class="pl-c1">sendall</span>(<span class="pl-s">b"HTTP/1.0 200 OK<span class="pl-cce">\r</span><span class="pl-cce">\n</span>Content-Type: text/plain<span class="pl-cce">\r</span><span class="pl-cce">\n</span>Content-Length: "</span>
+                  <span class="pl-c1">+</span> <span class="pl-en">str</span>(<span class="pl-en">len</span>(<span class="pl-s1">body</span>)).<span class="pl-c1">encode</span>() <span class="pl-c1">+</span> <span class="pl-s">b"<span class="pl-cce">\r</span><span class="pl-cce">\n</span>Connection: close<span class="pl-cce">\r</span><span class="pl-cce">\n</span><span class="pl-cce">\r</span><span class="pl-cce">\n</span>"</span> <span class="pl-c1">+</span> <span class="pl-s1">body</span>)
+        <span class="pl-s1">c</span>.<span class="pl-c1">close</span>()
+
+<span class="pl-k">for</span> <span class="pl-s1">p</span> <span class="pl-c1">in</span> <span class="pl-c1">PORTS</span>:
+    <span class="pl-s1">threading</span>.<span class="pl-c1">Thread</span>(<span class="pl-s1">target</span><span class="pl-c1">=</span><span class="pl-s1">serve</span>, <span class="pl-s1">args</span><span class="pl-c1">=</span>(<span class="pl-s1">p</span>,), <span class="pl-s1">daemon</span><span class="pl-c1">=</span><span class="pl-c1">True</span>).<span class="pl-c1">start</span>()
+<span class="pl-s1">threading</span>.<span class="pl-c1">Event</span>().<span class="pl-c1">wait</span>()</pre></div>
+<p>这个方法比端口扫描快得多，因为<strong>不用猜</strong>：你监听哪个端口，标记里就写着哪个端口号，从外面收到什么标记，就知道映射关系是什么。</p>
+<p>这台机器还测出一条额外结论：<strong>没有公网 IPv6，也无法主动连到 Cloudflare 或 GitHub</strong>（出网只通阿里云、npmmirror 这类国内源）。所以 Cloudflare Tunnel、CDN 回源这些方案在这里一律用不了。</p>
+<h2>二、于是只能挂在子路径上</h2>
+<p>唯一的入口是「公网 57914 → 内网 80」，而内网 80 上的默认站点是我原来的 WordPress。我不想为了一个新页面把博客挪走，所以选择把作品挂在 <code class="notranslate">/line/</code> 子路径下，WordPress 完全不受影响。</p>
+<p>对应地，构建产物的 <code class="notranslate">base</code> 必须跟着改：</p>
+<div class="highlight highlight-source-shell"><pre class="notranslate"><span class="pl-c1">cd</span> /www/wwwroot/unbroken-line
+pnpm <span class="pl-c1">exec</span> vite build --base=/line/ --outDir dist-line</pre></div>
+<p><code class="notranslate">--outDir dist-line</code> 是故意的：根路径版本（<code class="notranslate">base=/</code>，输出到 <code class="notranslate">dist/</code>）保留着，以后如果拿到独立端口，直接切过去就行。</p>
+<h2>三、宝塔面板下的扩展配置：只能写 location</h2>
+<p>宝塔的 nginx 站点配置支持 <code class="notranslate">extension</code> 目录，每个站点一个子目录，里面的 <code class="notranslate">.conf</code> 会被 <code class="notranslate">include</code> 进该站点的 <code class="notranslate">server {}</code> 里：</p>
+<pre class="notranslate"><code class="notranslate">/www/server/panel/vhost/nginx/extension/&lt;站点名&gt;/*.conf
+</code></pre>
+<p><strong>关键限制：这些文件里只能写 <code class="notranslate">location</code>，不能写 <code class="notranslate">server {}</code>。</strong> 我第一版不信邪，在里面写了一个 <code class="notranslate">server {}</code>，nginx 直接报 duplicate default server 起不来。</p>
+<p>最终配置：</p>
+<div class="highlight highlight-source-nginx"><pre class="notranslate"><span class="pl-c"># 挂载在现有站点下的子路径 /line/</span>
+<span class="pl-c"># 构建产物 base=/line/，目录 /www/wwwroot/unbroken-line/dist-line/</span>
+<span class="pl-c"># 公网入口： http://&lt;公网IP&gt;:57914/line/</span>
+
+<span class="pl-c1">location</span> = /line <span class="pl-c1">{</span>
+<span class="pl-c">    # 用 $http_host 保留端口，否则会跳到公网不通的 80 端口</span>
+    <span class="pl-k">return</span> <span class="pl-c1">301</span> <span class="pl-v">$scheme</span>://<span class="pl-v">$http_host</span>/line/<span class="pl-c1">;</span>
+<span class="pl-c1">}</span>
+
+<span class="pl-c1">location</span> ^<span class="pl-sr">~</span> /line/assets/ <span class="pl-c1">{</span>
+    <span class="pl-c1">alias</span> /www/wwwroot/unbroken-line/dist-line/assets/<span class="pl-c1">;</span>
+    <span class="pl-c1">expires</span> <span class="pl-c1">1y</span><span class="pl-c1">;</span>
+    <span class="pl-c1">add_header</span> Cache-Control <span class="pl-s">"public, max-age=31536000, immutable"</span><span class="pl-c1">;</span>
+    <span class="pl-c1">access_log</span> off<span class="pl-c1">;</span>
+<span class="pl-c1">}</span>
+
+<span class="pl-c1">location</span> ^<span class="pl-sr">~</span> /line/fonts/ <span class="pl-c1">{</span>
+    <span class="pl-c1">alias</span> /www/wwwroot/unbroken-line/dist-line/fonts/<span class="pl-c1">;</span>
+    <span class="pl-c1">expires</span> <span class="pl-c1">30d</span><span class="pl-c1">;</span>
+    <span class="pl-c1">add_header</span> Cache-Control <span class="pl-s">"public, max-age=2592000"</span><span class="pl-c1">;</span>
+    <span class="pl-c1">access_log</span> off<span class="pl-c1">;</span>
+<span class="pl-c1">}</span>
+
+<span class="pl-c1">location</span> ^<span class="pl-sr">~</span> /line/ <span class="pl-c1">{</span>
+    <span class="pl-c1">alias</span> /www/wwwroot/unbroken-line/dist-line/<span class="pl-c1">;</span>
+    <span class="pl-c1">index</span> <span class="pl-c1">index</span>.html<span class="pl-c1">;</span>
+    <span class="pl-c1">autoindex</span> off<span class="pl-c1">;</span>
+    <span class="pl-c1">access_log</span> off<span class="pl-c1">;</span>
+<span class="pl-c1">}</span></pre></div>
+<p>三个细节值得单独说：</p>
+<p><strong>1. <code class="notranslate">$http_host</code> 而不是 <code class="notranslate">$host</code>。</strong><br>
+<code class="notranslate">/line</code> 少了结尾斜杠时要跳转到 <code class="notranslate">/line/</code>。我第一版写的是 <code class="notranslate">return 301 $scheme://$host/line/;</code>——<code class="notranslate">$host</code> 是纯主机名，不带端口，于是浏览器被跳到 <code class="notranslate">http://&lt;IP&gt;/line/</code>，也就是 <strong>80 端口</strong>。而这台机器公网 80 是不通的，页面直接打不开。</p>
+<p>用 <code class="notranslate">$http_host</code> 才保留住 <code class="notranslate">:57914</code>。这个 bug 的隐蔽之处在于：如果你在本机用 <code class="notranslate">curl http://127.0.0.1/line</code> 测，它是<strong>正常的</strong>——因为本机 80 确实通。只有从公网访问才会暴露。所以我最后写了专门的验收脚本，全部带 <code class="notranslate">Host</code> 头模拟公网请求：</p>
+<div class="highlight highlight-source-shell"><pre class="notranslate">curl -s -o /dev/null -D- -H <span class="pl-s"><span class="pl-pds">'</span>Host: &lt;公网IP&gt;:57914<span class="pl-pds">'</span></span> http://127.0.0.1:80/line \
+  <span class="pl-k">|</span> grep -iE <span class="pl-s"><span class="pl-pds">'</span>^(HTTP|Location)<span class="pl-pds">'</span></span>
+<span class="pl-c"><span class="pl-c">#</span> 期望：301 且 Location 里带 :57914</span></pre></div>
+<p><strong>2. <code class="notranslate">alias</code> 必须写在 <code class="notranslate">location ^~ /line/</code> 里，而不是 <code class="notranslate">root</code>。</strong><br>
+<code class="notranslate">alias</code> 会把 location 匹配到的前缀<strong>替换</strong>掉；<code class="notranslate">root</code> 是<strong>拼接</strong>。用 <code class="notranslate">root /www/wwwroot/unbroken-line/dist-line;</code> 会去找 <code class="notranslate">dist-line/line/index.html</code>，404。</p>
+<p><strong>3. <code class="notranslate">^~</code> 前缀匹配的优先级。</strong><br>
+<code class="notranslate">assets/</code> 和 <code class="notranslate">fonts/</code> 用了更长的前缀，所以它们会先命中，拿到长缓存；其余请求落到 <code class="notranslate">/line/</code> 那条。</p>
+<h2>四、这台机器的另外两个坑</h2>
+<p><strong>npm 源不通。</strong> 服务器国内直连 <code class="notranslate">registry.npmjs.org</code> 超时，装依赖必须指定镜像：</p>
+<div class="highlight highlight-source-shell"><pre class="notranslate">npm i -g pnpm --registry=https://registry.npmmirror.com
+pnpm install --registry=https://registry.npmmirror.com</pre></div>
+<p><strong>磁盘 I/O 极慢。</strong> apt 解包一个 10MB 的包要七分钟以上。在服务器上跑构建会等到怀疑人生，所以最终流程改成：<strong>本地构建好，只上传 <code class="notranslate">dist-line/</code> 目录。</strong> 服务器上只放产物，不装 Node 工具链。</p>
+<h2>五、验收</h2>
+<p>配置改完不需要重启任何服务（nginx 直接读文件），但改配置本身要先检查再平滑重载：</p>
+<div class="highlight highlight-source-shell"><pre class="notranslate">/www/server/nginx/sbin/nginx -t <span class="pl-k">&amp;&amp;</span> /www/server/nginx/sbin/nginx -s reload</pre></div>
+<p>验收脚本跑三件事：作品页能开、静态资源能开、<strong>WordPress 没被搞坏</strong>。</p>
+<div class="highlight highlight-source-powershell"><pre class="notranslate"><span class="pl-c1">Write-Output</span> <span class="pl-s"><span class="pl-pds">"</span>===== 公网验收 =====<span class="pl-pds">"</span></span>
+<span class="pl-smi">$r</span> <span class="pl-k">=</span> <span class="pl-c1">Invoke-WebRequest</span> <span class="pl-k">-</span>Uri <span class="pl-s"><span class="pl-pds">'</span>http://&lt;公网IP&gt;:57914/line/<span class="pl-pds">'</span></span> <span class="pl-k">-</span>UseBasicParsing <span class="pl-k">-</span>TimeoutSec <span class="pl-c1">25</span> <span class="pl-k">`</span>
+     <span class="pl-k">-</span>Headers <span class="pl-k">@</span>{ <span class="pl-s"><span class="pl-pds">'</span>User-Agent<span class="pl-pds">'</span></span> <span class="pl-k">=</span> <span class="pl-s"><span class="pl-pds">'</span>Mozilla/5.0<span class="pl-pds">'</span></span> }
+<span class="pl-c1">Write-Output</span> (<span class="pl-s"><span class="pl-pds">"</span>首页  OK  {0}  {1} bytes<span class="pl-pds">"</span></span> <span class="pl-k">-f</span> <span class="pl-smi">$r<span class="pl-smi">.StatusCode</span></span><span class="pl-k">,</span> <span class="pl-smi">$r<span class="pl-smi">.RawContentLength</span></span>)
+
+<span class="pl-c"><span class="pl-c">#</span> 哈希文件名的资源，验证 alias 和缓存头</span>
+<span class="pl-k">foreach</span> (<span class="pl-smi">$u</span> <span class="pl-k">in</span> <span class="pl-k">@</span>(
+  <span class="pl-s"><span class="pl-pds">'</span>http://&lt;公网IP&gt;:57914/line/assets/index-Bz4Gf8fi.js<span class="pl-pds">'</span></span><span class="pl-k">,</span>
+  <span class="pl-s"><span class="pl-pds">'</span>http://&lt;公网IP&gt;:57914/line/assets/style-CwnDITju.css<span class="pl-pds">'</span></span><span class="pl-k">,</span>
+  <span class="pl-s"><span class="pl-pds">'</span>http://&lt;公网IP&gt;:57914/line/fonts/newsreader-normal-latin.woff2<span class="pl-pds">'</span></span>
+)) {
+  <span class="pl-smi">$h</span> <span class="pl-k">=</span> <span class="pl-c1">Invoke-WebRequest</span> <span class="pl-k">-</span>Uri <span class="pl-smi">$u</span> <span class="pl-k">-</span>Method Head <span class="pl-k">-</span>UseBasicParsing <span class="pl-k">-</span>TimeoutSec <span class="pl-c1">25</span> <span class="pl-k">`</span>
+       <span class="pl-k">-</span>Headers <span class="pl-k">@</span>{ <span class="pl-s"><span class="pl-pds">'</span>User-Agent<span class="pl-pds">'</span></span> <span class="pl-k">=</span> <span class="pl-s"><span class="pl-pds">'</span>Mozilla/5.0<span class="pl-pds">'</span></span> }
+  <span class="pl-c1">Write-Output</span> (<span class="pl-s"><span class="pl-pds">"</span>OK  {0}  {1}  {2}<span class="pl-pds">"</span></span> <span class="pl-k">-f</span> <span class="pl-smi">$h<span class="pl-smi">.StatusCode</span></span><span class="pl-k">,</span> <span class="pl-smi">$h<span class="pl-smi">.Headers</span></span>[<span class="pl-s"><span class="pl-pds">'</span>Content-Type<span class="pl-pds">'</span></span>]<span class="pl-k">,</span> <span class="pl-smi">$u</span>)
+}
+
+<span class="pl-c1">Write-Output</span> <span class="pl-s"><span class="pl-pds">"</span>===== 你的 WordPress =====<span class="pl-pds">"</span></span>
+<span class="pl-smi">$b</span> <span class="pl-k">=</span> <span class="pl-c1">Invoke-WebRequest</span> <span class="pl-k">-</span>Uri <span class="pl-s"><span class="pl-pds">'</span>http://&lt;公网IP&gt;:57914/<span class="pl-pds">'</span></span> <span class="pl-k">-</span>UseBasicParsing <span class="pl-k">-</span>TimeoutSec <span class="pl-c1">25</span> <span class="pl-k">`</span>
+     <span class="pl-k">-</span>Headers <span class="pl-k">@</span>{ <span class="pl-s"><span class="pl-pds">'</span>User-Agent<span class="pl-pds">'</span></span> <span class="pl-k">=</span> <span class="pl-s"><span class="pl-pds">'</span>Mozilla/5.0<span class="pl-pds">'</span></span> }
+<span class="pl-c1">Write-Output</span> (<span class="pl-s"><span class="pl-pds">"</span>博客首页  OK  {0}<span class="pl-pds">"</span></span> <span class="pl-k">-f</span> <span class="pl-smi">$b<span class="pl-smi">.StatusCode</span></span>)</pre></div>
+<p>最后一行是我最在意的。加子路径这件事的风险从来不是「新页面打不开」——那个一眼就能发现。风险是<strong>把原来好好的站点弄坏了，而你没注意</strong>。</p>
+<h2>六、怎么回滚</h2>
+<p>写在部署文档里的回滚步骤，全部实测过：</p>
+<div class="highlight highlight-source-shell"><pre class="notranslate"><span class="pl-c"><span class="pl-c">#</span> 1) 去掉子路径挂载（WordPress 立刻恢复原样）</span>
+rm -f /www/server/panel/vhost/nginx/extension/<span class="pl-k">*</span>/unbroken-line.conf
+/www/server/nginx/sbin/nginx -t <span class="pl-k">&amp;&amp;</span> /www/server/nginx/sbin/nginx -s reload
+
+<span class="pl-c"><span class="pl-c">#</span> 2) 去掉内网独立站点</span>
+rm -f /www/server/panel/vhost/nginx/unbroken-line.conf
+/www/server/nginx/sbin/nginx -s reload
+
+<span class="pl-c"><span class="pl-c">#</span> 3) 删代码（可选）</span>
+rm -rf /www/wwwroot/unbroken-line</pre></div>
+<hr>
+<h2>回头看</h2>
+<p>真正的教训只有一条：<strong>先花时间搞清楚网络拓扑，再动手写配置。</strong></p>
+<p>我在 nginx 配置上反复折腾的三轮，回溯起来都源于一开始的假设——「这台机器有很多端口可以用」。这个假设错了，之后的每一个决定都建在沙子上。花二十分钟写个端口探测脚本，能省掉后面两小时的瞎猜。</p>
+<p>至于 TLS：这台机器出网到不了 Let's Encrypt，所以目前是 HTTP。想上 HTTPS，得等域名真正解析到这台机器、并且有一个能用的 ACME 通道，那是另一件事了。</p></div>
+<div style="font-size:small;margin-top:8px;float:right;">ZERO · 用 GitHub Issues 写的博客</div>
+
+<button class="btn btn-block" type="button" onclick="openComments()" id="cmButton">评论</button>
+<div class="comments" id="comments"></div>
+
+</div>
+    <div id="footer"><div id="footer1">Copyright © <span id="copyrightYear"></span> <a href="https://tech-zerolei.github.io">ZERO</a></div>
+<div id="footer2">
+    <span id="runday"></span><span>Powered by <a href="https://meekdai.com/Gmeek.html" target="_blank">Gmeek</a></span>
+</div>
+
+<script>
+var now=new Date();
+document.getElementById("copyrightYear").innerHTML=now.getFullYear();
+
+if(""!=""){
+    var startSite=new Date("");
+    var diff=now.getTime()-startSite.getTime();
+    var diffDay=Math.floor(diff/(1000*60*60*24));
+    document.getElementById("runday").innerHTML="网站运行 "+diffDay+" 天"+" • ";
+}
+</script></div>
+</body>
+<script>
+var IconList={'sun': 'M8 10.5a2.5 2.5 0 100-5 2.5 2.5 0 000 5zM8 12a4 4 0 100-8 4 4 0 000 8zM8 0a.75.75 0 01.75.75v1.5a.75.75 0 01-1.5 0V.75A.75.75 0 018 0zm0 13a.75.75 0 01.75.75v1.5a.75.75 0 01-1.5 0v-1.5A.75.75 0 018 13zM2.343 2.343a.75.75 0 011.061 0l1.06 1.061a.75.75 0 01-1.06 1.06l-1.06-1.06a.75.75 0 010-1.06zm9.193 9.193a.75.75 0 011.06 0l1.061 1.06a.75.75 0 01-1.06 1.061l-1.061-1.06a.75.75 0 010-1.061zM16 8a.75.75 0 01-.75.75h-1.5a.75.75 0 010-1.5h1.5A.75.75 0 0116 8zM3 8a.75.75 0 01-.75.75H.75a.75.75 0 010-1.5h1.5A.75.75 0 013 8zm10.657-5.657a.75.75 0 010 1.061l-1.061 1.06a.75.75 0 11-1.06-1.06l1.06-1.06a.75.75 0 011.06 0zm-9.193 9.193a.75.75 0 010 1.06l-1.06 1.061a.75.75 0 11-1.061-1.06l1.06-1.061a.75.75 0 011.061 0z', 'moon': 'M9.598 1.591a.75.75 0 01.785-.175 7 7 0 11-8.967 8.967.75.75 0 01.961-.96 5.5 5.5 0 007.046-7.046.75.75 0 01.175-.786zm1.616 1.945a7 7 0 01-7.678 7.678 5.5 5.5 0 107.678-7.678z', 'sync': 'M1.705 8.005a.75.75 0 0 1 .834.656 5.5 5.5 0 0 0 9.592 2.97l-1.204-1.204a.25.25 0 0 1 .177-.427h3.646a.25.25 0 0 1 .25.25v3.646a.25.25 0 0 1-.427.177l-1.38-1.38A7.002 7.002 0 0 1 1.05 8.84a.75.75 0 0 1 .656-.834ZM8 2.5a5.487 5.487 0 0 0-4.131 1.869l1.204 1.204A.25.25 0 0 1 4.896 6H1.25A.25.25 0 0 1 1 5.75V2.104a.25.25 0 0 1 .427-.177l1.38 1.38A7.002 7.002 0 0 1 14.95 7.16a.75.75 0 0 1-1.49.178A5.5 5.5 0 0 0 8 2.5Z', 'home': 'M6.906.664a1.749 1.749 0 0 1 2.187 0l5.25 4.2c.415.332.657.835.657 1.367v7.019A1.75 1.75 0 0 1 13.25 15h-3.5a.75.75 0 0 1-.75-.75V9H7v5.25a.75.75 0 0 1-.75.75h-3.5A1.75 1.75 0 0 1 1 13.25V6.23c0-.531.242-1.034.657-1.366l5.25-4.2Zm1.25 1.171a.25.25 0 0 0-.312 0l-5.25 4.2a.25.25 0 0 0-.094.196v7.019c0 .138.112.25.25.25H5.5V8.25a.75.75 0 0 1 .75-.75h3.5a.75.75 0 0 1 .75.75v5.25h2.75a.25.25 0 0 0 .25-.25V6.23a.25.25 0 0 0-.094-.195Z', 'github': 'M8 0c4.42 0 8 3.58 8 8a8.013 8.013 0 0 1-5.45 7.59c-.4.08-.55-.17-.55-.38 0-.27.01-1.13.01-2.2 0-.75-.25-1.23-.54-1.48 1.78-.2 3.65-.88 3.65-3.95 0-.88-.31-1.59-.82-2.15.08-.2.36-1.02-.08-2.12 0 0-.67-.22-2.2.82-.64-.18-1.32-.27-2-.27-.68 0-1.36.09-2 .27-1.53-1.03-2.2-.82-2.2-.82-.44 1.1-.16 1.92-.08 2.12-.51.56-.82 1.28-.82 2.15 0 3.06 1.86 3.75 3.64 3.95-.23.2-.44.55-.51 1.07-.46.21-1.61.55-2.33-.66-.15-.24-.6-.83-1.23-.82-.67.01-.27.38.01.53.34.19.73.9.82 1.13.16.45.68 1.31 2.69.94 0 .67.01 1.3.01 1.49 0 .21-.15.45-.55.38A7.995 7.995 0 0 1 0 8c0-4.42 3.58-8 8-8Z', 'copy': 'M0 6.75C0 5.784.784 5 1.75 5h1.5a.75.75 0 0 1 0 1.5h-1.5a.25.25 0 0 0-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 0 0 .25-.25v-1.5a.75.75 0 0 1 1.5 0v1.5A1.75 1.75 0 0 1 9.25 16h-7.5A1.75 1.75 0 0 1 0 14.25Z M5 1.75C5 .784 5.784 0 6.75 0h7.5C15.216 0 16 .784 16 1.75v7.5A1.75 1.75 0 0 1 14.25 11h-7.5A1.75 1.75 0 0 1 5 9.25Zm1.75-.25a.25.25 0 0 0-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 0 0 .25-.25v-7.5a.25.25 0 0 0-.25-.25Z', 'check': 'M13.78 4.22a.75.75 0 0 1 0 1.06l-7.25 7.25a.75.75 0 0 1-1.06 0L2.22 9.28a.751.751 0 0 1 .018-1.042.751.751 0 0 1 1.042-.018L6 10.94l6.72-6.72a.75.75 0 0 1 1.06 0Z'};
+var utterancesLoad=0;
+
+let themeSettings={
+    "dark": ["dark","moon","#00f0ff","dark-blue"],
+    "light": ["light","sun","#ff5000","github-light"],
+    "auto": ["auto","sync","","preferred-color-scheme"]
+};
+function changeTheme(mode, icon, color, utheme){
+    document.documentElement.setAttribute("data-color-mode",mode);
+    document.getElementById("themeSwitch").setAttribute("d",value=IconList[icon]);
+    document.getElementById("themeSwitch").parentNode.style.color=color;
+    if(utterancesLoad==1){utterancesTheme(utheme);}
+}
+function modeSwitch(){
+    let currentMode=document.documentElement.getAttribute('data-color-mode');
+    let newMode = currentMode === "light" ? "dark" : currentMode === "dark" ? "auto" : "light";
+    localStorage.setItem("meek_theme", newMode);
+    if(themeSettings[newMode]){
+        changeTheme(...themeSettings[newMode]);
+    }
+}
+function utterancesTheme(theme){
+    const message={type:'set-theme',theme: theme};
+    const iframe=document.getElementsByClassName('utterances-frame')[0];
+    iframe.contentWindow.postMessage(message,'https://utteranc.es');
+}
+if(themeSettings[theme]){changeTheme(...themeSettings[theme]);}
+console.log("\n %c Gmeek last https://github.com/Meekdai/Gmeek \n","padding:5px 0;background:#02d81d;color:#fff");
+</script>
+
+<script>
+document.getElementById("pathHome").setAttribute("d",IconList["home"]);
+document.getElementById("pathIssue").setAttribute("d",IconList["github"]);
+
+
+
+function openComments(){
+    cm=document.getElementById("comments");
+    cmButton=document.getElementById("cmButton");
+    cmButton.disabled=true;
+    cmButton.innerHTML="loading";
+    span=document.createElement("span");
+    span.setAttribute("class","AnimatedEllipsis");
+    cmButton.appendChild(span);
+
+    script=document.createElement("script");
+    script.setAttribute("src","https://utteranc.es/client.js");
+    script.setAttribute("repo","tech-zerolei/tech-zerolei.github.io");
+    script.setAttribute("issue-term","title");
+    
+    if(localStorage.getItem("meek_theme")=="dark"){script.setAttribute("theme","dark-blue");}
+    else if(localStorage.getItem("meek_theme")=="light") {script.setAttribute("theme","github-light");}
+    else{script.setAttribute("theme","preferred-color-scheme");}
+    
+    script.setAttribute("crossorigin","anonymous");
+    script.setAttribute("async","");
+    cm.appendChild(script);
+
+    int=self.setInterval("iFrameLoading()",200);
+}
+
+function iFrameLoading(){
+    var utterances=document.getElementsByClassName('utterances');
+    if(utterances.length==1){
+        if(utterances[0].style.height!=""){
+            utterancesLoad=1;
+            int=window.clearInterval(int);
+            document.getElementById("cmButton").style.display="none";
+            console.log("utterances Load OK");
+        }
+    }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    const createClipboardHTML = (codeContent, additionalClasses = '') => `
+        <pre class="notranslate"><code class="notranslate">${codeContent}</code></pre>
+        <div class="clipboard-container position-absolute right-0 top-0 ${additionalClasses}">
+            <clipboard-copy class="ClipboardButton btn m-2 p-0" role="button" style="display: inherit;">
+                <svg height="16" width="16" class="octicon octicon-copy m-2"><path d="${IconList["copy"]}"></path></svg>
+                <svg height="16" width="16" class="octicon octicon-check color-fg-success m-2 d-none"><path d="${IconList["check"]}"></path></svg>
+            </clipboard-copy>
+            <div class="copy-feedback">Copied!</div>
+        </div>
+    `;
+
+    const handleCodeElements = (selector = '') => {
+        document.querySelectorAll(selector).forEach(codeElement => {
+            const codeContent = codeElement.innerHTML;
+            const newStructure = document.createElement('div');
+            newStructure.className = 'snippet-clipboard-content position-relative overflow-auto';
+            newStructure.innerHTML = createClipboardHTML(codeContent);
+
+            const parentElement = codeElement.parentElement;
+            if (selector.includes('highlight')) {
+                parentElement.insertBefore(newStructure, codeElement.nextSibling);
+                parentElement.removeChild(codeElement);
+            } else {
+                parentElement.parentElement.replaceChild(newStructure, parentElement);
+            }
+        });
+    };
+
+    handleCodeElements('pre.notranslate > code.notranslate');
+    handleCodeElements('div.highlight > pre.notranslate');
+
+    let currentFeedback = null;
+    document.querySelectorAll('clipboard-copy').forEach(copyButton => {
+        copyButton.addEventListener('click', () => {
+            const codeContent = copyButton.closest('.snippet-clipboard-content').innerText;
+            const tempTextArea = document.createElement('textarea');
+            tempTextArea.value = codeContent;
+            document.body.appendChild(tempTextArea);
+            tempTextArea.select();
+            document.execCommand('copy');
+            document.body.removeChild(tempTextArea);
+
+            const copyIcon = copyButton.querySelector('.octicon-copy');
+            const checkIcon = copyButton.querySelector('.octicon-check');
+            const copyFeedback = copyButton.nextElementSibling;
+
+            if (currentFeedback && currentFeedback !== copyFeedback) {currentFeedback.style.display = 'none';}
+            currentFeedback = copyFeedback;
+
+            copyIcon.classList.add('d-none');
+            checkIcon.classList.remove('d-none');
+            copyFeedback.style.display = 'block';
+            copyButton.style.borderColor = 'var(--color-success-fg)';
+
+            setTimeout(() => {
+                copyIcon.classList.remove('d-none');
+                checkIcon.classList.add('d-none');
+                copyFeedback.style.display = 'none';
+                copyButton.style.borderColor = '';
+            }, 2000);
+        });
+    });
+});
+
+</script>
+
+
+</html>

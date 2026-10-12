@@ -6,17 +6,17 @@
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <link href='https://mirrors.sustech.edu.cn/cdnjs/ajax/libs/Primer/21.0.7/primer.css' rel='stylesheet' />
     
-    <link rel="icon" href="https://github.githubassets.com/favicons/favicon.svg"><script>
+    <link rel="icon" href="https://avatars.githubusercontent.com/u/225638635?v=4"><script>
         let theme = localStorage.getItem("meek_theme") || "light";
         document.documentElement.setAttribute("data-color-mode", theme);
     </script>
-<meta name="description" content="hello。">
-<meta property="og:title" content="hello">
-<meta property="og:description" content="hello。">
+<meta name="description" content="这个博客叫 **ZERO**。">
+<meta property="og:title" content="ZERO：把个人博客建在 GitHub Issues 上">
+<meta property="og:description" content="这个博客叫 **ZERO**。">
 <meta property="og:type" content="article">
-<meta property="og:url" content="https://tech-zerolei.github.io/post/hello.html">
-<meta property="og:image" content="https://github.githubassets.com/favicons/favicon.svg">
-<title>hello</title>
+<meta property="og:url" content="https://tech-zerolei.github.io/post/2.html">
+<meta property="og:image" content="https://avatars.githubusercontent.com/u/225638635?v=4">
+<title>ZERO：把个人博客建在 GitHub Issues 上</title>
 
 
 
@@ -49,7 +49,7 @@ body{box-sizing: border-box;min-width: 200px;max-width: 900px;margin: 20px auto;
 
 <body>
     <div id="header">
-<h1 class="postTitle">hello</h1>
+<h1 class="postTitle">ZERO：把个人博客建在 GitHub Issues 上</h1>
 <div class="title-right">
     <a href="https://tech-zerolei.github.io" id="buttonHome" class="btn btn-invisible circle" title="首页">
         <svg class="octicon" width="16" height="16">
@@ -57,7 +57,7 @@ body{box-sizing: border-box;min-width: 200px;max-width: 900px;margin: 20px auto;
         </svg>
     </a>
     
-    <a href="https://github.com/tech-zerolei/tech-zerolei.github.io/issues/1" target="_blank" class="btn btn-invisible circle" title="Issue">
+    <a href="https://github.com/tech-zerolei/tech-zerolei.github.io/issues/2" target="_blank" class="btn btn-invisible circle" title="Issue">
         <svg class="octicon" width="16" height="16">
             <path id="pathIssue" fill-rule="evenodd"></path>
         </svg>
@@ -73,14 +73,32 @@ body{box-sizing: border-box;min-width: 200px;max-width: 900px;margin: 20px auto;
 </div>
 </div>
     <div id="content">
-<div class="markdown-body" id="postBody"><p>hello</p></div>
-<div style="font-size:small;margin-top:8px;float:right;"></div>
+<div class="markdown-body" id="postBody"><p>这个博客叫 <strong>ZERO</strong>。</p>
+<p>它的 GitHub Pages 骨架在 2026 年 9 月就建好了，用的是 Gmeek。然后它在那里放了三个星期，标题一直是 <code class="notranslate">Blog Title</code>，副标题一直是 <code class="notranslate">Blog description</code>，头像一直是 GitHub 的默认图标。只有一篇文章，正文是「hello。」。</p>
+<p>不是因为不在乎。是因为没想好叫什么。</p>
+<hr>
+<h2>为什么要写字</h2>
+<p>我做过的东西大多留在聊天记录和本地目录里：一台自己配的 Debian 服务器、几条把静态站点挂进 nginx 子路径的配置、一个叫《一根不断的线》的交互作品。它们都能跑，但没有一处写下来。等下次再遇到同一个坑，我得重新踩一遍。</p>
+<p>这个博客就是用来解决这件事的。<strong>写下来的东西才算真的做完。</strong></p>
+<h2>会写什么</h2>
+<ul>
+<li><strong>服务器</strong>：Debian、宝塔面板、nginx。怎么把一台 NAT 后面的机器接入公网，怎么在不影响已有站点的前提下挂上新东西，怎么在只能连国内源的机器上把前端构建跑起来。</li>
+<li><strong>前端</strong>：React、TypeScript、Vite。主要是那些在真实项目里必须做的决定——为什么这里不用 Canvas，为什么那里要多写一个断言脚本。</li>
+<li><strong>作品</strong>：做过的一些交互实验，以及它们背后的取舍。</li>
+</ul>
+<h2>不写什么</h2>
+<p>不写「10 个你必须知道的 JS 技巧」，不写没有代码的教程，不写我没亲手跑过的东西。</p>
+<h2>怎么写的</h2>
+<p>这个博客的每一篇文章都是一个 GitHub Issue。写完点发布，Actions 把它渲染成静态页面，提交，部署。没有后台、没有数据库、没有登录框，文章内容和它的讨论区在同一个地方。这个方案叫 <a href="https://github.com/Meekdai/Gmeek">Gmeek</a>，本站用的就是它。</p>
+<hr>
+<p>第一篇真正的内容，是我把《一根不断的线》挂上这台服务器时踩的坑。那件事花了比预想多得多的时间，值得记下来。</p></div>
+<div style="font-size:small;margin-top:8px;float:right;">ZERO · 用 GitHub Issues 写的博客</div>
 
 <button class="btn btn-block" type="button" onclick="openComments()" id="cmButton">评论</button>
 <div class="comments" id="comments"></div>
 
 </div>
-    <div id="footer"><div id="footer1">Copyright © <span id="copyrightYear"></span> <a href="https://tech-zerolei.github.io">Blog Title</a></div>
+    <div id="footer"><div id="footer1">Copyright © <span id="copyrightYear"></span> <a href="https://tech-zerolei.github.io">ZERO</a></div>
 <div id="footer2">
     <span id="runday"></span><span>Powered by <a href="https://meekdai.com/Gmeek.html" target="_blank">Gmeek</a></span>
 </div>

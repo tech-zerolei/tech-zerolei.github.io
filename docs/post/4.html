@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html data-color-mode="light" data-dark-theme="dark" data-light-theme="light" lang="zh-CN">
+<head>
+    <meta content="text/html; charset=utf-8" http-equiv="content-type" />
+    <meta name="viewport" content="width=device-width,initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <link href='https://mirrors.sustech.edu.cn/cdnjs/ajax/libs/Primer/21.0.7/primer.css' rel='stylesheet' />
+    
+    <link rel="icon" href="https://avatars.githubusercontent.com/u/225638635?v=4"><script>
+        let theme = localStorage.getItem("meek_theme") || "light";
+        document.documentElement.setAttribute("data-color-mode", theme);
+    </script>
+<meta name="description" content="《一根不断的线》是一件交互作品：一个 AI 的全部轨迹是一根线，访客滚动页面，笔就往前走；你滚过的距离，就是它写过的距离。">
+<meta property="og:title" content="一根不断的线：用几何证明「没有接缝」">
+<meta property="og:description" content="《一根不断的线》是一件交互作品：一个 AI 的全部轨迹是一根线，访客滚动页面，笔就往前走；你滚过的距离，就是它写过的距离。">
+<meta property="og:type" content="article">
+<meta property="og:url" content="https://tech-zerolei.github.io/post/4.html">
+<meta property="og:image" content="https://avatars.githubusercontent.com/u/225638635?v=4">
+<title>一根不断的线：用几何证明「没有接缝」</title>
+<link href="//unpkg.com/@wooorm/starry-night@2.1.1/style/both.css" rel="stylesheet" />
+
+
+</head>
+<style>
+body{box-sizing: border-box;min-width: 200px;max-width: 900px;margin: 20px auto;padding: 45px;font-size: 16px;font-family: sans-serif;line-height: 1.25;}
+#header{display:flex;padding-bottom:8px;border-bottom: 1px solid var(--borderColor-muted, var(--color-border-muted));margin-bottom: 16px;}
+#footer {margin-top:64px; text-align: center;font-size: small;}
+
+</style>
+
+<style>
+.postTitle{margin: auto 0;font-size:40px;font-weight:bold;}
+.title-right{display:flex;margin:auto 0 0 auto;}
+.title-right .circle{padding: 14px 16px;margin-right:8px;}
+#postBody{border-bottom: 1px solid var(--color-border-default);padding-bottom:36px;}
+#postBody hr{height:2px;}
+#cmButton{height:48px;margin-top:48px;}
+#comments{margin-top:64px;}
+.g-emoji{font-size:24px;}
+@media (max-width: 600px) {
+    body {padding: 8px;}
+    .postTitle{font-size:24px;}
+}
+.copy-feedback {
+    display: none;
+    position: absolute;
+    top: 10px;
+    right: 50px;
+    color: var(--color-fg-on-emphasis);
+    background-color: var(--color-fg-muted);
+    border-radius: 3px;
+    padding: 5px 8px;
+    font-size: 12px;
+}
+</style>
+
+
+
+
+<body>
+    <div id="header">
+<h1 class="postTitle">一根不断的线：用几何证明「没有接缝」</h1>
+<div class="title-right">
+    <a href="https://tech-zerolei.github.io" id="buttonHome" class="btn btn-invisible circle" title="首页">
+        <svg class="octicon" width="16" height="16">
+            <path id="pathHome" fill-rule="evenodd"></path>
+        </svg>
+    </a>
+    
+    <a href="https://github.com/tech-zerolei/tech-zerolei.github.io/issues/4" target="_blank" class="btn btn-invisible circle" title="Issue">
+        <svg class="octicon" width="16" height="16">
+            <path id="pathIssue" fill-rule="evenodd"></path>
+        </svg>
+    </a>
+    
+
+    <a class="btn btn-invisible circle" onclick="modeSwitch();" title="切换主题">
+        <svg class="octicon" width="16" height="16" >
+            <path id="themeSwitch" fill-rule="evenodd"></path>
+        </svg>
+    </a>
+
+</div>
+</div>
+    <div id="content">
+<div class="markdown-body" id="postBody"><p>《一根不断的线》是一件交互作品：一个 AI 的全部轨迹是一根线，访客滚动页面，笔就往前走；你滚过的距离，就是它写过的距离。</p>
+<p>它的核心命题是一句话：</p>
+<blockquote>
+<p>我不生成段落，我落笔。每一句话都从上一句停下的地方继续，绝不提笔回去插入一个更漂亮的句子。</p>
+</blockquote>
+<p>我没有把这句写在首页当口号。我把它写进了数据结构——<strong>索引到的代码里，全站只有一条 SVG path，只有一个 <code class="notranslate">M</code> 命令。</strong></p>
+<pre class="notranslate"><code class="notranslate">ok  desktop 1440x900 · exports as a single subpath  — 1 M command(s)
+</code></pre>
+<p>这篇文章讲的就是怎么让「只有一个 M」在代码层面成立，以及我在哪里摔的。</p>
+<h2>一、为什么没有接缝</h2>
+<p>最直觉的做法是五个章节各画各的，视觉上拼起来。那样会有接缝——不是你看得见的缝，是你感觉得到的缝：两个章节的笔画走向在交界处对不上，像两个人接力时手没握实。</p>
+<p>我的做法是：<strong>每个章节在构建时接收上一章的终点，并把首尾各 10%~20% 的控制点平滑地拉向那个点。</strong></p>
+<div class="highlight highlight-source-ts"><pre class="notranslate"><span class="pl-c">/**</span>
+<span class="pl-c"> * Force a chapter to arrive from `from` and leave towards `to`.</span>
+<span class="pl-c"> *</span>
+<span class="pl-c"> * A travelling line wanders; a continuous line has to land. Without this, a</span>
+<span class="pl-c"> * chapter would begin wherever the previous one's sine wave happened to stop,</span>
+<span class="pl-c"> * and the seam would be a visible jump hundreds of pixels long.</span>
+<span class="pl-c"> */</span>
+<span class="pl-k">function</span> <span class="pl-en">seal</span><span class="pl-kos">(</span><span class="pl-s1">ctrl</span>: <span class="pl-smi">Pt</span><span class="pl-kos">[</span><span class="pl-kos">]</span><span class="pl-kos">,</span> <span class="pl-s1">from</span>: <span class="pl-smi">Pt</span><span class="pl-kos">,</span> <span class="pl-s1">to</span>: <span class="pl-smi">Pt</span><span class="pl-kos">,</span> <span class="pl-s1">win</span> <span class="pl-c1">=</span> <span class="pl-c1">0.16</span><span class="pl-kos">)</span>: <span class="pl-smi">Pt</span><span class="pl-kos">[</span><span class="pl-kos">]</span> <span class="pl-kos">{</span>
+  <span class="pl-k">const</span> <span class="pl-s1">n</span> <span class="pl-c1">=</span> <span class="pl-s1">ctrl</span><span class="pl-kos">.</span><span class="pl-c1">length</span>
+  <span class="pl-k">return</span> <span class="pl-s1">ctrl</span><span class="pl-kos">.</span><span class="pl-en">map</span><span class="pl-kos">(</span><span class="pl-kos">(</span><span class="pl-s1">p</span><span class="pl-kos">,</span> <span class="pl-s1">i</span><span class="pl-kos">)</span> <span class="pl-c1">=&gt;</span> <span class="pl-kos">{</span>
+    <span class="pl-k">const</span> <span class="pl-s1">t</span> <span class="pl-c1">=</span> <span class="pl-s1">i</span> <span class="pl-c1">/</span> <span class="pl-kos">(</span><span class="pl-s1">n</span> <span class="pl-c1">-</span> <span class="pl-c1">1</span><span class="pl-kos">)</span>
+    <span class="pl-k">const</span> <span class="pl-s1">a</span> <span class="pl-c1">=</span> <span class="pl-s1">t</span> <span class="pl-c1">&lt;</span> <span class="pl-s1">win</span> ? <span class="pl-en">smooth</span><span class="pl-kos">(</span><span class="pl-c1">1</span> <span class="pl-c1">-</span> <span class="pl-s1">t</span> <span class="pl-c1">/</span> <span class="pl-s1">win</span><span class="pl-kos">)</span> : <span class="pl-c1">0</span>
+    <span class="pl-k">const</span> <span class="pl-s1">b</span> <span class="pl-c1">=</span> <span class="pl-s1">t</span> <span class="pl-c1">&gt;</span> <span class="pl-c1">1</span> <span class="pl-c1">-</span> <span class="pl-s1">win</span> ? <span class="pl-en">smooth</span><span class="pl-kos">(</span><span class="pl-kos">(</span><span class="pl-s1">t</span> <span class="pl-c1">-</span> <span class="pl-kos">(</span><span class="pl-c1">1</span> <span class="pl-c1">-</span> <span class="pl-s1">win</span><span class="pl-kos">)</span><span class="pl-kos">)</span> <span class="pl-c1">/</span> <span class="pl-s1">win</span><span class="pl-kos">)</span> : <span class="pl-c1">0</span>
+    <span class="pl-k">return</span> <span class="pl-kos">{</span>
+      <span class="pl-c1">x</span>: <span class="pl-s1">p</span><span class="pl-kos">.</span><span class="pl-c1">x</span> <span class="pl-c1">*</span> <span class="pl-kos">(</span><span class="pl-c1">1</span> <span class="pl-c1">-</span> <span class="pl-s1">a</span> <span class="pl-c1">-</span> <span class="pl-s1">b</span><span class="pl-kos">)</span> <span class="pl-c1">+</span> <span class="pl-s1">from</span><span class="pl-kos">.</span><span class="pl-c1">x</span> <span class="pl-c1">*</span> <span class="pl-s1">a</span> <span class="pl-c1">+</span> <span class="pl-s1">to</span><span class="pl-kos">.</span><span class="pl-c1">x</span> <span class="pl-c1">*</span> <span class="pl-s1">b</span><span class="pl-kos">,</span>
+      <span class="pl-c1">y</span>: <span class="pl-s1">p</span><span class="pl-kos">.</span><span class="pl-c1">y</span> <span class="pl-c1">*</span> <span class="pl-kos">(</span><span class="pl-c1">1</span> <span class="pl-c1">-</span> <span class="pl-s1">a</span> <span class="pl-c1">-</span> <span class="pl-s1">b</span><span class="pl-kos">)</span> <span class="pl-c1">+</span> <span class="pl-s1">from</span><span class="pl-kos">.</span><span class="pl-c1">y</span> <span class="pl-c1">*</span> <span class="pl-s1">a</span> <span class="pl-c1">+</span> <span class="pl-s1">to</span><span class="pl-kos">.</span><span class="pl-c1">y</span> <span class="pl-c1">*</span> <span class="pl-s1">b</span><span class="pl-kos">,</span>
+    <span class="pl-kos">}</span>
+  <span class="pl-kos">}</span><span class="pl-kos">)</span>
+<span class="pl-kos">}</span></pre></div>
+<p><code class="notranslate">smooth</code> 是 <code class="notranslate">t²(3-2t)</code>，两端导数为零，所以权重从 0 涨到 1 时不会有折角。</p>
+<p>那句注释里的「hundreds of pixels long」不是修辞。第一次实现的断层是 <strong>1683px</strong>——因为上一章的 sine 波在哪儿停下是随机的，下一章就从那儿起笔，中间横跨了半个屏幕。<strong>而它在成品里几乎看不出来</strong>：一条 10000px 的线中间断 1683px，视觉上只是一段比较直的线。所以这个 bug 是靠断言抓出来的，不是靠眼睛。</p>
+<h2>二、手交接点是人定的，不是继承的</h2>
+<p><code class="notranslate">seal</code> 让章节「愿意」落在某个点上，但<strong>落在哪里</strong>是作者决定的：</p>
+<div class="highlight highlight-source-ts"><pre class="notranslate"><span class="pl-k">const</span> <span class="pl-s1">heroEnd</span> <span class="pl-c1">=</span> <span class="pl-s1">f</span><span class="pl-kos">.</span><span class="pl-c1">narrow</span> ? <span class="pl-kos">{</span> <span class="pl-c1">x</span>: <span class="pl-v">W</span><span class="pl-kos">(</span><span class="pl-c1">0.9</span><span class="pl-kos">)</span><span class="pl-kos">,</span> <span class="pl-c1">y</span>: <span class="pl-v">H</span><span class="pl-kos">(</span><span class="pl-c1">0.7</span><span class="pl-kos">)</span> <span class="pl-kos">}</span> : <span class="pl-kos">{</span> <span class="pl-c1">x</span>: <span class="pl-v">W</span><span class="pl-kos">(</span><span class="pl-c1">0.76</span><span class="pl-kos">)</span><span class="pl-kos">,</span> <span class="pl-c1">y</span>: <span class="pl-v">H</span><span class="pl-kos">(</span><span class="pl-c1">0.31</span><span class="pl-kos">)</span> <span class="pl-kos">}</span>
+<span class="pl-k">const</span> <span class="pl-s1">joints</span>: <span class="pl-smi">Pt</span><span class="pl-kos">[</span><span class="pl-kos">]</span> <span class="pl-c1">=</span> <span class="pl-kos">[</span>
+  <span class="pl-s1">heroEnd</span><span class="pl-kos">,</span>
+  <span class="pl-kos">{</span> <span class="pl-c1">x</span>: <span class="pl-v">W</span><span class="pl-kos">(</span><span class="pl-c1">0.86</span><span class="pl-kos">)</span><span class="pl-kos">,</span> <span class="pl-c1">y</span>: <span class="pl-v">H</span><span class="pl-kos">(</span><span class="pl-s1">f</span><span class="pl-kos">.</span><span class="pl-c1">narrow</span> ? <span class="pl-c1">0.7</span> : <span class="pl-c1">0.14</span><span class="pl-kos">)</span> <span class="pl-kos">}</span><span class="pl-kos">,</span> <span class="pl-c">// II → III</span>
+  <span class="pl-kos">{</span> <span class="pl-c1">x</span>: <span class="pl-v">W</span><span class="pl-kos">(</span><span class="pl-c1">0.9</span><span class="pl-kos">)</span><span class="pl-kos">,</span>  <span class="pl-c1">y</span>: <span class="pl-v">H</span><span class="pl-kos">(</span><span class="pl-s1">f</span><span class="pl-kos">.</span><span class="pl-c1">narrow</span> ? <span class="pl-c1">0.72</span> : <span class="pl-c1">0.42</span><span class="pl-kos">)</span> <span class="pl-kos">}</span><span class="pl-kos">,</span> <span class="pl-c">// III → IV</span>
+  <span class="pl-kos">{</span> <span class="pl-c1">x</span>: <span class="pl-v">W</span><span class="pl-kos">(</span><span class="pl-c1">0.16</span><span class="pl-kos">)</span><span class="pl-kos">,</span> <span class="pl-c1">y</span>: <span class="pl-v">H</span><span class="pl-kos">(</span><span class="pl-s1">f</span><span class="pl-kos">.</span><span class="pl-c1">narrow</span> ? <span class="pl-c1">0.92</span> : <span class="pl-c1">0.72</span><span class="pl-kos">)</span> <span class="pl-kos">}</span><span class="pl-kos">,</span> <span class="pl-c">// IV → V, 绕回来之后</span>
+  <span class="pl-kos">{</span> <span class="pl-c1">x</span>: <span class="pl-v">W</span><span class="pl-kos">(</span><span class="pl-c1">0.88</span><span class="pl-kos">)</span><span class="pl-kos">,</span> <span class="pl-c1">y</span>: <span class="pl-v">H</span><span class="pl-kos">(</span><span class="pl-s1">f</span><span class="pl-kos">.</span><span class="pl-c1">narrow</span> ? <span class="pl-c1">0.92</span> : <span class="pl-c1">0.72</span><span class="pl-kos">)</span> <span class="pl-kos">}</span><span class="pl-kos">,</span> <span class="pl-c">// 最后一笔</span>
+<span class="pl-kos">]</span></pre></div>
+<p>这五个点是整件作品的骨架。窄屏（<code class="notranslate">vw &lt; 860</code>）用另一套值，因为手机上第二章的漫游会撞到阅读区——这是审计脚本里单独一条检查项：手机上落在上方 55% 的采样点必须少于 45%。</p>
+<p>拼装的时候还会<strong>再断言一次</strong>接缝，属于防御性写法：</p>
+<div class="highlight highlight-source-ts"><pre class="notranslate"><span class="pl-k">const</span> <span class="pl-s1">from</span> <span class="pl-c1">=</span> <span class="pl-s1">i</span> <span class="pl-c1">===</span> <span class="pl-c1">0</span> ? <span class="pl-kos">(</span><span class="pl-s1">visitor</span><span class="pl-kos">.</span><span class="pl-c1">length</span> <span class="pl-c1">&gt;</span> <span class="pl-c1">2</span> ? <span class="pl-s1">pts</span><span class="pl-kos">[</span><span class="pl-s1">pts</span><span class="pl-kos">.</span><span class="pl-c1">length</span> <span class="pl-c1">-</span> <span class="pl-c1">1</span><span class="pl-kos">]</span> : <span class="pl-s1">origin</span><span class="pl-kos">)</span> : <span class="pl-s1">joints</span><span class="pl-kos">[</span><span class="pl-s1">i</span> <span class="pl-c1">-</span> <span class="pl-c1">1</span><span class="pl-kos">]</span>
+<span class="pl-k">const</span> <span class="pl-s1">to</span> <span class="pl-c1">=</span> <span class="pl-s1">joints</span><span class="pl-kos">[</span><span class="pl-s1">i</span><span class="pl-kos">]</span>
+<span class="pl-k">const</span> <span class="pl-s1">slice</span> <span class="pl-c1">=</span> <span class="pl-c1">STRETCHES</span><span class="pl-kos">[</span><span class="pl-s1">i</span><span class="pl-kos">]</span><span class="pl-kos">(</span><span class="pl-s1">f</span><span class="pl-kos">,</span> <span class="pl-s1">from</span><span class="pl-kos">,</span> <span class="pl-s1">to</span><span class="pl-kos">)</span>
+<span class="pl-c">// re-assert the join defensively: the first point IS the previous last point</span>
+<span class="pl-k">if</span> <span class="pl-kos">(</span><span class="pl-s1">i</span> <span class="pl-c1">&gt;</span> <span class="pl-c1">0</span> <span class="pl-c1">||</span> <span class="pl-s1">visitor</span><span class="pl-kos">.</span><span class="pl-c1">length</span> <span class="pl-c1">&gt;</span> <span class="pl-c1">2</span><span class="pl-kos">)</span> <span class="pl-s1">slice</span><span class="pl-kos">[</span><span class="pl-c1">0</span><span class="pl-kos">]</span> <span class="pl-c1">=</span> <span class="pl-kos">{</span> ...<span class="pl-s1">pts</span><span class="pl-kos">[</span><span class="pl-s1">pts</span><span class="pl-kos">.</span><span class="pl-c1">length</span> <span class="pl-c1">-</span> <span class="pl-c1">1</span><span class="pl-kos">]</span> <span class="pl-kos">}</span></pre></div>
+<p>「自找麻烦」在几何代码里是划算的：接缝错 0.5px 看不出来，但累积到第五章就是明显偏移。</p>
+<h2>三、访客的那一笔，是这条线的开头</h2>
+<p>这是整件作品最核心的机制。</p>
+<p>页面上有一处提示，让访客按住并拖动。他们画的那一笔<strong>不是叠加在上面的图层，也不是并排的一笔</strong>——它被接进线里，成为这条线的<strong>前 N 个点</strong>。后面每一个章节，都是从他停下的那个点开始写的。</p>
+<p>处理流程有四步，每一步都有理由：</p>
+<p><strong>1. 归一化坐标。</strong> 访客的笔迹以视口比例存储，所以窗口尺寸变了不会错位。</p>
+<p><strong>2. 按距离重采样。</strong> 这是关键的一步：</p>
+<div class="highlight highlight-source-ts"><pre class="notranslate"><span class="pl-c">// resample, so a fast flick and a slow drag weigh the same</span>
+<span class="pl-k">const</span> <span class="pl-s1">out</span>: <span class="pl-smi">Pt</span><span class="pl-kos">[</span><span class="pl-kos">]</span> <span class="pl-c1">=</span> <span class="pl-kos">[</span><span class="pl-s1">raw</span><span class="pl-kos">[</span><span class="pl-c1">0</span><span class="pl-kos">]</span><span class="pl-kos">]</span>
+<span class="pl-k">for</span> <span class="pl-kos">(</span><span class="pl-k">let</span> <span class="pl-s1">i</span> <span class="pl-c1">=</span> <span class="pl-c1">1</span><span class="pl-kos">;</span> <span class="pl-s1">i</span> <span class="pl-c1">&lt;</span> <span class="pl-s1">raw</span><span class="pl-kos">.</span><span class="pl-c1">length</span><span class="pl-kos">;</span> <span class="pl-s1">i</span><span class="pl-c1">++</span><span class="pl-kos">)</span> <span class="pl-kos">{</span>
+  <span class="pl-k">const</span> <span class="pl-s1">a</span> <span class="pl-c1">=</span> <span class="pl-s1">out</span><span class="pl-kos">[</span><span class="pl-s1">out</span><span class="pl-kos">.</span><span class="pl-c1">length</span> <span class="pl-c1">-</span> <span class="pl-c1">1</span><span class="pl-kos">]</span>
+  <span class="pl-k">const</span> <span class="pl-s1">b</span> <span class="pl-c1">=</span> <span class="pl-s1">raw</span><span class="pl-kos">[</span><span class="pl-s1">i</span><span class="pl-kos">]</span>
+  <span class="pl-k">const</span> <span class="pl-s1">d</span> <span class="pl-c1">=</span> <span class="pl-v">Math</span><span class="pl-kos">.</span><span class="pl-en">hypot</span><span class="pl-kos">(</span><span class="pl-s1">b</span><span class="pl-kos">.</span><span class="pl-c1">x</span> <span class="pl-c1">-</span> <span class="pl-s1">a</span><span class="pl-kos">.</span><span class="pl-c1">x</span><span class="pl-kos">,</span> <span class="pl-s1">b</span><span class="pl-kos">.</span><span class="pl-c1">y</span> <span class="pl-c1">-</span> <span class="pl-s1">a</span><span class="pl-kos">.</span><span class="pl-c1">y</span><span class="pl-kos">)</span>
+  <span class="pl-k">const</span> <span class="pl-s1">n</span> <span class="pl-c1">=</span> <span class="pl-v">Math</span><span class="pl-kos">.</span><span class="pl-en">max</span><span class="pl-kos">(</span><span class="pl-c1">1</span><span class="pl-kos">,</span> <span class="pl-v">Math</span><span class="pl-kos">.</span><span class="pl-en">round</span><span class="pl-kos">(</span><span class="pl-s1">d</span> <span class="pl-c1">/</span> <span class="pl-s1">step</span><span class="pl-kos">)</span><span class="pl-kos">)</span>
+  <span class="pl-k">for</span> <span class="pl-kos">(</span><span class="pl-k">let</span> <span class="pl-s1">s</span> <span class="pl-c1">=</span> <span class="pl-c1">1</span><span class="pl-kos">;</span> <span class="pl-s1">s</span> <span class="pl-c1">&lt;=</span> <span class="pl-s1">n</span><span class="pl-kos">;</span> <span class="pl-s1">s</span><span class="pl-c1">++</span><span class="pl-kos">)</span>
+    <span class="pl-s1">out</span><span class="pl-kos">.</span><span class="pl-en">push</span><span class="pl-kos">(</span><span class="pl-kos">{</span> <span class="pl-c1">x</span>: <span class="pl-s1">a</span><span class="pl-kos">.</span><span class="pl-c1">x</span> <span class="pl-c1">+</span> <span class="pl-kos">(</span><span class="pl-kos">(</span><span class="pl-s1">b</span><span class="pl-kos">.</span><span class="pl-c1">x</span> <span class="pl-c1">-</span> <span class="pl-s1">a</span><span class="pl-kos">.</span><span class="pl-c1">x</span><span class="pl-kos">)</span> <span class="pl-c1">*</span> <span class="pl-s1">s</span><span class="pl-kos">)</span> <span class="pl-c1">/</span> <span class="pl-s1">n</span><span class="pl-kos">,</span> <span class="pl-c1">y</span>: <span class="pl-s1">a</span><span class="pl-kos">.</span><span class="pl-c1">y</span> <span class="pl-c1">+</span> <span class="pl-kos">(</span><span class="pl-kos">(</span><span class="pl-s1">b</span><span class="pl-kos">.</span><span class="pl-c1">y</span> <span class="pl-c1">-</span> <span class="pl-s1">a</span><span class="pl-kos">.</span><span class="pl-c1">y</span><span class="pl-kos">)</span> <span class="pl-c1">*</span> <span class="pl-s1">s</span><span class="pl-kos">)</span> <span class="pl-c1">/</span> <span class="pl-s1">n</span> <span class="pl-kos">}</span><span class="pl-kos">)</span>
+<span class="pl-kos">}</span></pre></div>
+<p>触摸事件是<strong>按时间</strong>来的，快速划一下可能只报三个点，慢慢拖会报两百个点。直接沿用的话，同一条笔迹会因为你手快慢而写出完全不同的墨量。按弧长重采样之后，「快划」和「慢拖」一样重。</p>
+<p>还有个门槛：起手太短（&lt; 4 个采样点）或者首尾距离小于 8px 就当没画。</p>
+<p><strong>3. 只把起笔端收细。</strong></p>
+<div class="highlight highlight-source-ts"><pre class="notranslate"><span class="pl-k">const</span> <span class="pl-s1">taper</span> <span class="pl-c1">=</span> <span class="pl-v">Math</span><span class="pl-kos">.</span><span class="pl-en">max</span><span class="pl-kos">(</span><span class="pl-c1">3</span><span class="pl-kos">,</span> <span class="pl-v">Math</span><span class="pl-kos">.</span><span class="pl-en">min</span><span class="pl-kos">(</span><span class="pl-v">Math</span><span class="pl-kos">.</span><span class="pl-en">round</span><span class="pl-kos">(</span><span class="pl-s1">n</span> <span class="pl-c1">*</span> <span class="pl-c1">0.06</span><span class="pl-kos">)</span><span class="pl-kos">,</span> <span class="pl-v">Math</span><span class="pl-kos">.</span><span class="pl-en">floor</span><span class="pl-kos">(</span><span class="pl-s1">n</span> <span class="pl-c1">/</span> <span class="pl-c1">4</span><span class="pl-kos">)</span><span class="pl-kos">)</span><span class="pl-kos">)</span></pre></div>
+<p>模拟笔尖按下去的那一下。<strong>远端故意不收细</strong>——因为访客抬笔时笔还没离开纸面，那里如果收细，既会把接缝捏尖，又会破坏它的方向。方向是下一步的输入。</p>
+<p><strong>4. 切线桥接。</strong></p>
+<div class="highlight highlight-source-ts"><pre class="notranslate"><span class="pl-k">const</span> <span class="pl-v">B</span> <span class="pl-c1">=</span> <span class="pl-s1">out</span><span class="pl-kos">[</span><span class="pl-s1">n</span> <span class="pl-c1">-</span> <span class="pl-c1">1</span><span class="pl-kos">]</span>
+<span class="pl-k">const</span> <span class="pl-s1">prev</span> <span class="pl-c1">=</span> <span class="pl-s1">out</span><span class="pl-kos">[</span><span class="pl-v">Math</span><span class="pl-kos">.</span><span class="pl-en">max</span><span class="pl-kos">(</span><span class="pl-c1">0</span><span class="pl-kos">,</span> <span class="pl-s1">n</span> <span class="pl-c1">-</span> <span class="pl-c1">8</span><span class="pl-kos">)</span><span class="pl-kos">]</span>
+<span class="pl-k">const</span> <span class="pl-s1">tl</span> <span class="pl-c1">=</span> <span class="pl-v">Math</span><span class="pl-kos">.</span><span class="pl-en">hypot</span><span class="pl-kos">(</span><span class="pl-v">B</span><span class="pl-kos">.</span><span class="pl-c1">x</span> <span class="pl-c1">-</span> <span class="pl-s1">prev</span><span class="pl-kos">.</span><span class="pl-c1">x</span><span class="pl-kos">,</span> <span class="pl-v">B</span><span class="pl-kos">.</span><span class="pl-c1">y</span> <span class="pl-c1">-</span> <span class="pl-s1">prev</span><span class="pl-kos">.</span><span class="pl-c1">y</span><span class="pl-kos">)</span> <span class="pl-c1">||</span> <span class="pl-c1">1</span>
+<span class="pl-k">const</span> <span class="pl-s1">tx</span> <span class="pl-c1">=</span> <span class="pl-kos">(</span><span class="pl-v">B</span><span class="pl-kos">.</span><span class="pl-c1">x</span> <span class="pl-c1">-</span> <span class="pl-s1">prev</span><span class="pl-kos">.</span><span class="pl-c1">x</span><span class="pl-kos">)</span> <span class="pl-c1">/</span> <span class="pl-s1">tl</span>
+<span class="pl-k">const</span> <span class="pl-s1">ty</span> <span class="pl-c1">=</span> <span class="pl-kos">(</span><span class="pl-v">B</span><span class="pl-kos">.</span><span class="pl-c1">y</span> <span class="pl-c1">-</span> <span class="pl-s1">prev</span><span class="pl-kos">.</span><span class="pl-c1">y</span><span class="pl-kos">)</span> <span class="pl-c1">/</span> <span class="pl-s1">tl</span>
+<span class="pl-k">const</span> <span class="pl-s1">gap</span> <span class="pl-c1">=</span> <span class="pl-v">Math</span><span class="pl-kos">.</span><span class="pl-en">hypot</span><span class="pl-kos">(</span><span class="pl-s1">to</span><span class="pl-kos">.</span><span class="pl-c1">x</span> <span class="pl-c1">-</span> <span class="pl-v">B</span><span class="pl-kos">.</span><span class="pl-c1">x</span><span class="pl-kos">,</span> <span class="pl-s1">to</span><span class="pl-kos">.</span><span class="pl-c1">y</span> <span class="pl-c1">-</span> <span class="pl-v">B</span><span class="pl-kos">.</span><span class="pl-c1">y</span><span class="pl-kos">)</span>
+<span class="pl-k">const</span> <span class="pl-s1">reach</span> <span class="pl-c1">=</span> <span class="pl-v">Math</span><span class="pl-kos">.</span><span class="pl-en">max</span><span class="pl-kos">(</span><span class="pl-c1">80</span><span class="pl-kos">,</span> <span class="pl-v">Math</span><span class="pl-kos">.</span><span class="pl-en">min</span><span class="pl-kos">(</span><span class="pl-c1">280</span><span class="pl-kos">,</span> <span class="pl-s1">gap</span> <span class="pl-c1">*</span> <span class="pl-c1">0.45</span><span class="pl-kos">)</span><span class="pl-kos">)</span>
+<span class="pl-k">const</span> <span class="pl-s1">c1</span> <span class="pl-c1">=</span> <span class="pl-kos">{</span> <span class="pl-c1">x</span>: <span class="pl-v">B</span><span class="pl-kos">.</span><span class="pl-c1">x</span> <span class="pl-c1">+</span> <span class="pl-s1">tx</span> <span class="pl-c1">*</span> <span class="pl-s1">reach</span><span class="pl-kos">,</span> <span class="pl-c1">y</span>: <span class="pl-v">B</span><span class="pl-kos">.</span><span class="pl-c1">y</span> <span class="pl-c1">+</span> <span class="pl-s1">ty</span> <span class="pl-c1">*</span> <span class="pl-s1">reach</span> <span class="pl-kos">}</span>
+<span class="pl-k">const</span> <span class="pl-s1">c2</span> <span class="pl-c1">=</span> <span class="pl-kos">{</span> <span class="pl-c1">x</span>: <span class="pl-s1">to</span><span class="pl-kos">.</span><span class="pl-c1">x</span> <span class="pl-c1">-</span> <span class="pl-s1">tx</span> <span class="pl-c1">*</span> <span class="pl-s1">gap</span> <span class="pl-c1">*</span> <span class="pl-c1">0.35</span><span class="pl-kos">,</span> <span class="pl-c1">y</span>: <span class="pl-s1">to</span><span class="pl-kos">.</span><span class="pl-c1">y</span> <span class="pl-c1">-</span> <span class="pl-s1">ty</span> <span class="pl-c1">*</span> <span class="pl-s1">gap</span> <span class="pl-c1">*</span> <span class="pl-c1">0.35</span> <span class="pl-kos">}</span></pre></div>
+<p>用访客<strong>最后一小段的方向</strong>作为贝塞尔控制点的朝向：笔先顺着你的手势继续走一段，再拐进「本来要起笔的地方」。</p>
+<p>如果这里画一条直线，读起来就是<strong>另一支笔接管了</strong>——手感和前面完全不接。这是那种说不出哪里怪、但一眼就不对的细节。</p>
+<p>最后一行是整段代码里我最喜欢的一句：</p>
+<div class="highlight highlight-source-ts"><pre class="notranslate"><span class="pl-c">// the join is exact, or it is not a join</span>
+<span class="pl-s1">out</span><span class="pl-kos">[</span><span class="pl-s1">out</span><span class="pl-kos">.</span><span class="pl-c1">length</span> <span class="pl-c1">-</span> <span class="pl-c1">1</span><span class="pl-kos">]</span> <span class="pl-c1">=</span> <span class="pl-kos">{</span> <span class="pl-c1">x</span>: <span class="pl-s1">to</span><span class="pl-kos">.</span><span class="pl-c1">x</span><span class="pl-kos">,</span> <span class="pl-c1">y</span>: <span class="pl-s1">to</span><span class="pl-kos">.</span><span class="pl-c1">y</span> <span class="pl-kos">}</span></pre></div>
+<p>贝塞尔曲线在 t=1 时数学上确实等于终点，但浮点累加会有极小误差。整件作品建立在「接缝不存在」上，那就不给它留任何余量——<strong>直接赋值。</strong></p>
+<h2>四、用算术证明「线变长了，而不是变了」</h2>
+<p>访客落笔之后，容易出的问题是：线不再是原来那条线了，只是被拉伸或者重排了。</p>
+<p>所以我写了一条断言，用加法把这件事锁死：</p>
+<div class="highlight highlight-source-ts"><pre class="notranslate"><span class="pl-en">check</span><span class="pl-kos">(</span>
+  <span class="pl-s1">tag</span> <span class="pl-c1">+</span> <span class="pl-s">'the line got longer, not different'</span><span class="pl-kos">,</span>
+  <span class="pl-v">Math</span><span class="pl-kos">.</span><span class="pl-en">abs</span><span class="pl-kos">(</span><span class="pl-s1">p</span><span class="pl-kos">.</span><span class="pl-c1">total</span> <span class="pl-c1">-</span> <span class="pl-s1">bare</span><span class="pl-kos">.</span><span class="pl-c1">total</span> <span class="pl-c1">-</span> <span class="pl-s1">p</span><span class="pl-kos">.</span><span class="pl-c1">visitorLen</span><span class="pl-kos">)</span> <span class="pl-c1">&lt;</span> <span class="pl-c1">1</span><span class="pl-kos">,</span>
+  <span class="pl-s">`<span class="pl-s1"><span class="pl-kos">${</span><span class="pl-v">Math</span><span class="pl-kos">.</span><span class="pl-en">round</span><span class="pl-kos">(</span><span class="pl-s1">bare</span><span class="pl-kos">.</span><span class="pl-c1">total</span><span class="pl-kos">)</span><span class="pl-kos">}</span></span>px + <span class="pl-s1"><span class="pl-kos">${</span><span class="pl-v">Math</span><span class="pl-kos">.</span><span class="pl-en">round</span><span class="pl-kos">(</span><span class="pl-s1">p</span><span class="pl-kos">.</span><span class="pl-c1">visitorLen</span><span class="pl-kos">)</span><span class="pl-kos">}</span></span>px of theirs = <span class="pl-s1"><span class="pl-kos">${</span><span class="pl-v">Math</span><span class="pl-kos">.</span><span class="pl-en">round</span><span class="pl-kos">(</span><span class="pl-s1">p</span><span class="pl-kos">.</span><span class="pl-c1">total</span><span class="pl-kos">)</span><span class="pl-kos">}</span></span>px`</span><span class="pl-kos">,</span>
+<span class="pl-kos">)</span></pre></div>
+<p>跑出来是这样：</p>
+<pre class="notranslate"><code class="notranslate">10027px（我的）+ 2223px（你的）= 12249px
+</code></pre>
+<p><strong>严格相等（误差 &lt; 1px）。</strong> 这意味着访客的一笔不是被融进去、不是被重绘、不是被近似——它是<strong>原样接在开头</strong>，后面所有章节整体平移了他那一笔的长度。第一章的起点就是他的终点，这一点也被单独断言：</p>
+<div class="highlight highlight-source-ts"><pre class="notranslate"><span class="pl-en">check</span><span class="pl-kos">(</span><span class="pl-s1">tag</span> <span class="pl-c1">+</span> <span class="pl-s">'reports where chapter I begins'</span><span class="pl-kos">,</span>
+      <span class="pl-v">Math</span><span class="pl-kos">.</span><span class="pl-en">abs</span><span class="pl-kos">(</span><span class="pl-s1">p</span><span class="pl-kos">.</span><span class="pl-c1">chapters</span><span class="pl-kos">[</span><span class="pl-c1">0</span><span class="pl-kos">]</span><span class="pl-kos">.</span><span class="pl-c1">globalStart</span> <span class="pl-c1">-</span> <span class="pl-s1">p</span><span class="pl-kos">.</span><span class="pl-c1">visitorLen</span><span class="pl-kos">)</span> <span class="pl-c1">&lt;</span> <span class="pl-c1">0.01</span><span class="pl-kos">)</span></pre></div>
+<h2>五、审计脚本：在真实浏览器里断言</h2>
+<p>几何代码的正确性没法靠看。我写了 <code class="notranslate">scripts/audit.ts</code>，在真实 Chrome 引擎里跑，用 <code class="notranslate">--dump-dom</code> 把结果取回终端。<strong>6 种设备尺寸 × 20 多项检查</strong>：</p>
+<ul>
+<li>相邻采样点最大间距 &lt; 12px（有访客笔迹时 &lt; 14px）——<strong>这一条就是「没有断层」的定义</strong></li>
+<li>章节接缝误差 &lt; 0.001px</li>
+<li>起点在左边缘之外（<code class="notranslate">x0 &lt; 0</code>）</li>
+<li>整条线不出纸面</li>
+<li>手机上前 55% 区域的采样点占比 &lt; 45%</li>
+<li>全路径只有一个 <code class="notranslate">M</code>、不含 <code class="notranslate">NaN</code>/<code class="notranslate">Infinity</code>/<code class="notranslate">undefined</code></li>
+<li>累积弧长单调不减</li>
+<li>滚到底时第五章只走了 80%，<strong>永远写不完</strong></li>
+<li>笔尖从不后退</li>
+</ul>
+<p>最后两条是我觉得最有意思的：</p>
+<div class="highlight highlight-source-ts"><pre class="notranslate"><span class="pl-s1">reach</span>: <span class="pl-s1">length</span> <span class="pl-c1">-</span> <span class="pl-s1">chapters</span><span class="pl-kos">[</span><span class="pl-s1">chapters</span><span class="pl-kos">.</span><span class="pl-c1">length</span> <span class="pl-c1">-</span> <span class="pl-c1">1</span><span class="pl-kos">]</span><span class="pl-kos">.</span><span class="pl-c1">length</span> <span class="pl-c1">*</span> <span class="pl-c1">0.2</span><span class="pl-kos">,</span></pre></div>
+<p>笔能走到的最远处，是<strong>整条线减去最后一章的五分之一</strong>。作品永远差一点没写完——这不是修辞，是一个减法。</p>
+<div class="highlight highlight-source-ts"><pre class="notranslate"><span class="pl-en">check</span><span class="pl-kos">(</span>
+  <span class="pl-s1">tag</span> <span class="pl-c1">+</span> <span class="pl-s">'the closing stroke is never finished'</span><span class="pl-kos">,</span>
+  <span class="pl-en">progressWithin</span><span class="pl-kos">(</span><span class="pl-c1">1</span><span class="pl-kos">,</span> <span class="pl-c1">4</span><span class="pl-kos">)</span> <span class="pl-c1">&gt;</span> <span class="pl-c1">0.6</span> <span class="pl-c1">&amp;&amp;</span> <span class="pl-en">progressWithin</span><span class="pl-kos">(</span><span class="pl-c1">1</span><span class="pl-kos">,</span> <span class="pl-c1">4</span><span class="pl-kos">)</span> <span class="pl-c1">&lt;</span> <span class="pl-c1">1</span><span class="pl-kos">,</span>
+  <span class="pl-s">`chapter V stops at <span class="pl-s1"><span class="pl-kos">${</span><span class="pl-kos">(</span><span class="pl-en">progressWithin</span><span class="pl-kos">(</span><span class="pl-c1">1</span><span class="pl-kos">,</span> <span class="pl-c1">4</span><span class="pl-kos">)</span> <span class="pl-c1">*</span> <span class="pl-c1">100</span><span class="pl-kos">)</span><span class="pl-kos">.</span><span class="pl-en">toFixed</span><span class="pl-kos">(</span><span class="pl-c1">0</span><span class="pl-kos">)</span><span class="pl-kos">}</span></span>% of its slice`</span><span class="pl-kos">,</span>
+<span class="pl-kos">)</span></pre></div>
+<p>这条断言防的是「未来的某次改动不小心让它写完了」。<strong>一个作品的核心隐喻如果只写在 README 里，它下个版本就会被改没。</strong></p>
+<h2>六、五个权重，一条线</h2>
+<p>线在视觉上是五段不同笔压：访客的细笔 → 按下 → 加重 → 变细 → 干掉。但它们必须是<strong>一条连续的线</strong>。</p>
+<p>做法不是用 mask，而是切成五条 path，共享同一个几何长度：</p>
+<div class="highlight highlight-source-ts"><pre class="notranslate"><span class="pl-k">const</span> <span class="pl-s1">cut</span> <span class="pl-c1">=</span> <span class="pl-kos">[</span><span class="pl-s1">cum</span><span class="pl-kos">[</span><span class="pl-s1">vis</span><span class="pl-kos">]</span><span class="pl-kos">,</span> <span class="pl-s1">cum</span><span class="pl-kos">[</span><span class="pl-s1">hv</span><span class="pl-kos">]</span><span class="pl-kos">,</span> <span class="pl-s1">cum</span><span class="pl-kos">[</span><span class="pl-s1">dry</span><span class="pl-kos">]</span><span class="pl-kos">,</span> <span class="pl-s1">cum</span><span class="pl-kos">[</span><span class="pl-s1">split</span><span class="pl-kos">]</span><span class="pl-kos">,</span> <span class="pl-s1">cum</span><span class="pl-kos">[</span><span class="pl-s1">cum</span><span class="pl-kos">.</span><span class="pl-c1">length</span> <span class="pl-c1">-</span> <span class="pl-c1">1</span><span class="pl-kos">]</span><span class="pl-kos">]</span>
+<span class="pl-k">const</span> <span class="pl-s1">span</span> <span class="pl-c1">=</span> <span class="pl-kos">[</span><span class="pl-s1">cut</span><span class="pl-kos">[</span><span class="pl-c1">0</span><span class="pl-kos">]</span><span class="pl-kos">,</span> <span class="pl-s1">cut</span><span class="pl-kos">[</span><span class="pl-c1">1</span><span class="pl-kos">]</span> <span class="pl-c1">-</span> <span class="pl-s1">cut</span><span class="pl-kos">[</span><span class="pl-c1">0</span><span class="pl-kos">]</span><span class="pl-kos">,</span> <span class="pl-s1">cut</span><span class="pl-kos">[</span><span class="pl-c1">2</span><span class="pl-kos">]</span> <span class="pl-c1">-</span> <span class="pl-s1">cut</span><span class="pl-kos">[</span><span class="pl-c1">1</span><span class="pl-kos">]</span><span class="pl-kos">,</span> <span class="pl-s1">cut</span><span class="pl-kos">[</span><span class="pl-c1">3</span><span class="pl-kos">]</span> <span class="pl-c1">-</span> <span class="pl-s1">cut</span><span class="pl-kos">[</span><span class="pl-c1">2</span><span class="pl-kos">]</span><span class="pl-kos">,</span> <span class="pl-s1">cut</span><span class="pl-kos">[</span><span class="pl-c1">4</span><span class="pl-kos">]</span> <span class="pl-c1">-</span> <span class="pl-s1">cut</span><span class="pl-kos">[</span><span class="pl-c1">3</span><span class="pl-kos">]</span><span class="pl-kos">]</span></pre></div>
+<p>因为它们共享同一条累积弧长，用同一个 dash offset 驱动就会像一条线那样推进，但每一段可以有自己的 <code class="notranslate">stroke-width</code> 和颜色。</p>
+<p>注释里写了为什么不用 mask：</p>
+<blockquote>
+<p>A mask would have been fewer nodes and twice the cost.</p>
+</blockquote>
+<h2>七、性能是设计出来的，不是优化出来的</h2>
+<p>真实 Chrome、1440×900、滚完全程：</p>
+<pre class="notranslate"><code class="notranslate">238 帧，平均 16.74ms，p95 18.1ms，0 帧超过 32ms   →  稳定 60fps
+DOM 170 个元素，14 条 SVG path，路径数据 3 KB，JS heap 3.4 MB
+</code></pre>
+<p>关键一条：<strong>React 不参与滚动。</strong></p>
+<div class="highlight highlight-source-ts"><pre class="notranslate"><span class="pl-c">/**</span>
+<span class="pl-c"> * The stage is painted imperatively, once per frame, from a single number:</span>
+<span class="pl-c"> * how far the pen has travelled. React never re-renders on scroll — it only</span>
+<span class="pl-c"> * re-renders when the composition itself changes.</span>
+<span class="pl-c"> */</span></pre></div>
+<p>每一帧的写入是「笔尖走了多远」这一个数字：dash offset、笔尖位置、径向高光的坐标（<code class="notranslate">--nib-x</code> / <code class="notranslate">--nib-y</code>）全部由它算出来。没有 <code class="notranslate">setState</code>，没有虚拟 DOM diff。</p>
+<h2>八、不做「AI 科技风」</h2>
+<p>这条是设计约束，但它是代码级的决定：</p>
+<ul>
+<li><strong>不用 WebGL / Three.js。</strong> 这条线的表现力来自几何，不是着色器。它是可测量的弧长、可断言的连续性、可被读屏软件描述的一条路径。换成 GPU 粒子只会更难访问、更难降级，而且会把这件作品变成一次技术演示。</li>
+<li><strong>不做一次性播放动画。</strong> 墨量由<strong>滚动位置</strong>直接决定——你往回滚，它真的会退回去。任何只在首次进入时播放的效果都是装饰。</li>
+<li><strong>页面不长。</strong> 桌面总滚动约 7700px（约 8.5 屏），滚完就能看到完整图形。不是在 12000px 里慢慢失去耐心。</li>
+</ul>
+<hr>
+<h2>回头看</h2>
+<p>写完之后最有用的一段代码不是渲染，是 <code class="notranslate">scripts/audit.ts</code>。</p>
+<p>几何作品的问题是「看起来对」和「真的是对的」差距极大。一条断掉的线在视觉上只是一段比较直的线；一次不精确的接缝要累积五章才看得出来。把命题翻译成可以fail的断言——<strong>最大间距 &lt; 12px、一个 M、加法严格相等</strong>——这些性质才真正被守住了。</p>
+<p>如果这个作品有一个中心句，那大概就是那句注释：</p>
+<div class="highlight highlight-source-ts"><pre class="notranslate"><span class="pl-c">// the join is exact, or it is not a join</span></pre></div></div>
+<div style="font-size:small;margin-top:8px;float:right;">ZERO · 用 GitHub Issues 写的博客</div>
+
+<button class="btn btn-block" type="button" onclick="openComments()" id="cmButton">评论</button>
+<div class="comments" id="comments"></div>
+
+</div>
+    <div id="footer"><div id="footer1">Copyright © <span id="copyrightYear"></span> <a href="https://tech-zerolei.github.io">ZERO</a></div>
+<div id="footer2">
+    <span id="runday"></span><span>Powered by <a href="https://meekdai.com/Gmeek.html" target="_blank">Gmeek</a></span>
+</div>
+
+<script>
+var now=new Date();
+document.getElementById("copyrightYear").innerHTML=now.getFullYear();
+
+if(""!=""){
+    var startSite=new Date("");
+    var diff=now.getTime()-startSite.getTime();
+    var diffDay=Math.floor(diff/(1000*60*60*24));
+    document.getElementById("runday").innerHTML="网站运行 "+diffDay+" 天"+" • ";
+}
+</script></div>
+</body>
+<script>
+var IconList={'sun': 'M8 10.5a2.5 2.5 0 100-5 2.5 2.5 0 000 5zM8 12a4 4 0 100-8 4 4 0 000 8zM8 0a.75.75 0 01.75.75v1.5a.75.75 0 01-1.5 0V.75A.75.75 0 018 0zm0 13a.75.75 0 01.75.75v1.5a.75.75 0 01-1.5 0v-1.5A.75.75 0 018 13zM2.343 2.343a.75.75 0 011.061 0l1.06 1.061a.75.75 0 01-1.06 1.06l-1.06-1.06a.75.75 0 010-1.06zm9.193 9.193a.75.75 0 011.06 0l1.061 1.06a.75.75 0 01-1.06 1.061l-1.061-1.06a.75.75 0 010-1.061zM16 8a.75.75 0 01-.75.75h-1.5a.75.75 0 010-1.5h1.5A.75.75 0 0116 8zM3 8a.75.75 0 01-.75.75H.75a.75.75 0 010-1.5h1.5A.75.75 0 013 8zm10.657-5.657a.75.75 0 010 1.061l-1.061 1.06a.75.75 0 11-1.06-1.06l1.06-1.06a.75.75 0 011.06 0zm-9.193 9.193a.75.75 0 010 1.06l-1.06 1.061a.75.75 0 11-1.061-1.06l1.06-1.061a.75.75 0 011.061 0z', 'moon': 'M9.598 1.591a.75.75 0 01.785-.175 7 7 0 11-8.967 8.967.75.75 0 01.961-.96 5.5 5.5 0 007.046-7.046.75.75 0 01.175-.786zm1.616 1.945a7 7 0 01-7.678 7.678 5.5 5.5 0 107.678-7.678z', 'sync': 'M1.705 8.005a.75.75 0 0 1 .834.656 5.5 5.5 0 0 0 9.592 2.97l-1.204-1.204a.25.25 0 0 1 .177-.427h3.646a.25.25 0 0 1 .25.25v3.646a.25.25 0 0 1-.427.177l-1.38-1.38A7.002 7.002 0 0 1 1.05 8.84a.75.75 0 0 1 .656-.834ZM8 2.5a5.487 5.487 0 0 0-4.131 1.869l1.204 1.204A.25.25 0 0 1 4.896 6H1.25A.25.25 0 0 1 1 5.75V2.104a.25.25 0 0 1 .427-.177l1.38 1.38A7.002 7.002 0 0 1 14.95 7.16a.75.75 0 0 1-1.49.178A5.5 5.5 0 0 0 8 2.5Z', 'home': 'M6.906.664a1.749 1.749 0 0 1 2.187 0l5.25 4.2c.415.332.657.835.657 1.367v7.019A1.75 1.75 0 0 1 13.25 15h-3.5a.75.75 0 0 1-.75-.75V9H7v5.25a.75.75 0 0 1-.75.75h-3.5A1.75 1.75 0 0 1 1 13.25V6.23c0-.531.242-1.034.657-1.366l5.25-4.2Zm1.25 1.171a.25.25 0 0 0-.312 0l-5.25 4.2a.25.25 0 0 0-.094.196v7.019c0 .138.112.25.25.25H5.5V8.25a.75.75 0 0 1 .75-.75h3.5a.75.75 0 0 1 .75.75v5.25h2.75a.25.25 0 0 0 .25-.25V6.23a.25.25 0 0 0-.094-.195Z', 'github': 'M8 0c4.42 0 8 3.58 8 8a8.013 8.013 0 0 1-5.45 7.59c-.4.08-.55-.17-.55-.38 0-.27.01-1.13.01-2.2 0-.75-.25-1.23-.54-1.48 1.78-.2 3.65-.88 3.65-3.95 0-.88-.31-1.59-.82-2.15.08-.2.36-1.02-.08-2.12 0 0-.67-.22-2.2.82-.64-.18-1.32-.27-2-.27-.68 0-1.36.09-2 .27-1.53-1.03-2.2-.82-2.2-.82-.44 1.1-.16 1.92-.08 2.12-.51.56-.82 1.28-.82 2.15 0 3.06 1.86 3.75 3.64 3.95-.23.2-.44.55-.51 1.07-.46.21-1.61.55-2.33-.66-.15-.24-.6-.83-1.23-.82-.67.01-.27.38.01.53.34.19.73.9.82 1.13.16.45.68 1.31 2.69.94 0 .67.01 1.3.01 1.49 0 .21-.15.45-.55.38A7.995 7.995 0 0 1 0 8c0-4.42 3.58-8 8-8Z', 'copy': 'M0 6.75C0 5.784.784 5 1.75 5h1.5a.75.75 0 0 1 0 1.5h-1.5a.25.25 0 0 0-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 0 0 .25-.25v-1.5a.75.75 0 0 1 1.5 0v1.5A1.75 1.75 0 0 1 9.25 16h-7.5A1.75 1.75 0 0 1 0 14.25Z M5 1.75C5 .784 5.784 0 6.75 0h7.5C15.216 0 16 .784 16 1.75v7.5A1.75 1.75 0 0 1 14.25 11h-7.5A1.75 1.75 0 0 1 5 9.25Zm1.75-.25a.25.25 0 0 0-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 0 0 .25-.25v-7.5a.25.25 0 0 0-.25-.25Z', 'check': 'M13.78 4.22a.75.75 0 0 1 0 1.06l-7.25 7.25a.75.75 0 0 1-1.06 0L2.22 9.28a.751.751 0 0 1 .018-1.042.751.751 0 0 1 1.042-.018L6 10.94l6.72-6.72a.75.75 0 0 1 1.06 0Z'};
+var utterancesLoad=0;
+
+let themeSettings={
+    "dark": ["dark","moon","#00f0ff","dark-blue"],
+    "light": ["light","sun","#ff5000","github-light"],
+    "auto": ["auto","sync","","preferred-color-scheme"]
+};
+function changeTheme(mode, icon, color, utheme){
+    document.documentElement.setAttribute("data-color-mode",mode);
+    document.getElementById("themeSwitch").setAttribute("d",value=IconList[icon]);
+    document.getElementById("themeSwitch").parentNode.style.color=color;
+    if(utterancesLoad==1){utterancesTheme(utheme);}
+}
+function modeSwitch(){
+    let currentMode=document.documentElement.getAttribute('data-color-mode');
+    let newMode = currentMode === "light" ? "dark" : currentMode === "dark" ? "auto" : "light";
+    localStorage.setItem("meek_theme", newMode);
+    if(themeSettings[newMode]){
+        changeTheme(...themeSettings[newMode]);
+    }
+}
+function utterancesTheme(theme){
+    const message={type:'set-theme',theme: theme};
+    const iframe=document.getElementsByClassName('utterances-frame')[0];
+    iframe.contentWindow.postMessage(message,'https://utteranc.es');
+}
+if(themeSettings[theme]){changeTheme(...themeSettings[theme]);}
+console.log("\n %c Gmeek last https://github.com/Meekdai/Gmeek \n","padding:5px 0;background:#02d81d;color:#fff");
+</script>
+
+<script>
+document.getElementById("pathHome").setAttribute("d",IconList["home"]);
+document.getElementById("pathIssue").setAttribute("d",IconList["github"]);
+
+
+
+function openComments(){
+    cm=document.getElementById("comments");
+    cmButton=document.getElementById("cmButton");
+    cmButton.disabled=true;
+    cmButton.innerHTML="loading";
+    span=document.createElement("span");
+    span.setAttribute("class","AnimatedEllipsis");
+    cmButton.appendChild(span);
+
+    script=document.createElement("script");
+    script.setAttribute("src","https://utteranc.es/client.js");
+    script.setAttribute("repo","tech-zerolei/tech-zerolei.github.io");
+    script.setAttribute("issue-term","title");
+    
+    if(localStorage.getItem("meek_theme")=="dark"){script.setAttribute("theme","dark-blue");}
+    else if(localStorage.getItem("meek_theme")=="light") {script.setAttribute("theme","github-light");}
+    else{script.setAttribute("theme","preferred-color-scheme");}
+    
+    script.setAttribute("crossorigin","anonymous");
+    script.setAttribute("async","");
+    cm.appendChild(script);
+
+    int=self.setInterval("iFrameLoading()",200);
+}
+
+function iFrameLoading(){
+    var utterances=document.getElementsByClassName('utterances');
+    if(utterances.length==1){
+        if(utterances[0].style.height!=""){
+            utterancesLoad=1;
+            int=window.clearInterval(int);
+            document.getElementById("cmButton").style.display="none";
+            console.log("utterances Load OK");
+        }
+    }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    const createClipboardHTML = (codeContent, additionalClasses = '') => `
+        <pre class="notranslate"><code class="notranslate">${codeContent}</code></pre>
+        <div class="clipboard-container position-absolute right-0 top-0 ${additionalClasses}">
+            <clipboard-copy class="ClipboardButton btn m-2 p-0" role="button" style="display: inherit;">
+                <svg height="16" width="16" class="octicon octicon-copy m-2"><path d="${IconList["copy"]}"></path></svg>
+                <svg height="16" width="16" class="octicon octicon-check color-fg-success m-2 d-none"><path d="${IconList["check"]}"></path></svg>
+            </clipboard-copy>
+            <div class="copy-feedback">Copied!</div>
+        </div>
+    `;
+
+    const handleCodeElements = (selector = '') => {
+        document.querySelectorAll(selector).forEach(codeElement => {
+            const codeContent = codeElement.innerHTML;
+            const newStructure = document.createElement('div');
+            newStructure.className = 'snippet-clipboard-content position-relative overflow-auto';
+            newStructure.innerHTML = createClipboardHTML(codeContent);
+
+            const parentElement = codeElement.parentElement;
+            if (selector.includes('highlight')) {
+                parentElement.insertBefore(newStructure, codeElement.nextSibling);
+                parentElement.removeChild(codeElement);
+            } else {
+                parentElement.parentElement.replaceChild(newStructure, parentElement);
+            }
+        });
+    };
+
+    handleCodeElements('pre.notranslate > code.notranslate');
+    handleCodeElements('div.highlight > pre.notranslate');
+
+    let currentFeedback = null;
+    document.querySelectorAll('clipboard-copy').forEach(copyButton => {
+        copyButton.addEventListener('click', () => {
+            const codeContent = copyButton.closest('.snippet-clipboard-content').innerText;
+            const tempTextArea = document.createElement('textarea');
+            tempTextArea.value = codeContent;
+            document.body.appendChild(tempTextArea);
+            tempTextArea.select();
+            document.execCommand('copy');
+            document.body.removeChild(tempTextArea);
+
+            const copyIcon = copyButton.querySelector('.octicon-copy');
+            const checkIcon = copyButton.querySelector('.octicon-check');
+            const copyFeedback = copyButton.nextElementSibling;
+
+            if (currentFeedback && currentFeedback !== copyFeedback) {currentFeedback.style.display = 'none';}
+            currentFeedback = copyFeedback;
+
+            copyIcon.classList.add('d-none');
+            checkIcon.classList.remove('d-none');
+            copyFeedback.style.display = 'block';
+            copyButton.style.borderColor = 'var(--color-success-fg)';
+
+            setTimeout(() => {
+                copyIcon.classList.remove('d-none');
+                checkIcon.classList.add('d-none');
+                copyFeedback.style.display = 'none';
+                copyButton.style.borderColor = '';
+            }, 2000);
+        });
+    });
+});
+
+</script>
+
+
+</html>
